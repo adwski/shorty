@@ -67,7 +67,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	if _, err = w.Write([]byte(svc.getServedURL(shortPath) + "\r\n")); err != nil {
+	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
 		log.WithError(err).Error("error writing body")
 	}
 }
