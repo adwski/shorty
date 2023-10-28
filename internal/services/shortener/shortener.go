@@ -1,12 +1,13 @@
 package shortener
 
 import (
-	"github.com/adwski/shorty/internal/storage"
-	"github.com/adwski/shorty/internal/validate"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/adwski/shorty/internal/storage"
+	"github.com/adwski/shorty/internal/validate"
+	log "github.com/sirupsen/logrus"
 )
 
 type Service struct {
@@ -51,7 +52,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if srcURL.Scheme != svc.redirectScheme {
+	if svc.redirectScheme != "" && srcURL.Scheme != svc.redirectScheme {
 		w.WriteHeader(http.StatusBadRequest)
 		log.WithFields(log.Fields{
 			"scheme":    srcURL.Scheme,
@@ -60,9 +61,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	urlToStore := srcURL.Host + srcURL.Path
-
-	if shortPath, err = svc.store.StoreUnique(urlToStore); err != nil {
+	if shortPath, err = svc.store.StoreUnique(srcURL.String()); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.WithError(err).Error("cannot store url")
 	}

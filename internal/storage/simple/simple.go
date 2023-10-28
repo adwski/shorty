@@ -2,9 +2,10 @@ package simple
 
 import (
 	"fmt"
-	"github.com/adwski/shorty/internal/storage/common"
 	"math/rand"
 	"sync"
+
+	"github.com/adwski/shorty/internal/storage/common"
 )
 
 type Simple struct {

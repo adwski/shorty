@@ -1,22 +1,19 @@
 package app
 
 import (
+	stdLog "log"
+	"net/http"
+	"time"
+
 	"github.com/adwski/shorty/internal/services/redirector"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/storage/simple"
 	log "github.com/sirupsen/logrus"
-
-	stdLog "log"
-	"net/http"
-	"time"
 )
 
 const (
 	defaultTimeout = time.Second
-
-	defaultServeScheme    = "http"
-	defaultRedirectScheme = "https"
 )
 
 type Shorty struct {
@@ -42,13 +39,12 @@ func NewShorty(cfg *ShortyConfig) *Shorty {
 		store: store,
 		shortenerSvc: shortener.NewService(&shortener.ServiceConfig{
 			Store:          store,
-			ServedScheme:   defaultServeScheme,
-			RedirectScheme: defaultRedirectScheme,
+			ServedScheme:   cfg.ServedScheme,
+			RedirectScheme: cfg.RedirectScheme,
 			Host:           cfg.Host,
 		}),
 		redirectorSvc: redirector.NewService(&redirector.ServiceConfig{
-			Store:  store,
-			Scheme: defaultRedirectScheme,
+			Store: store,
 		}),
 		server: &http.Server{
 			Addr:              ":8080",

@@ -1,30 +1,27 @@
 package redirector
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/storage/common"
 	"github.com/adwski/shorty/internal/validate"
 	log "github.com/sirupsen/logrus"
-
-	"errors"
-	"net/http"
 )
 
 // Service is redirector service
 type Service struct {
-	store  storage.Storage
-	scheme string
+	store storage.Storage
 }
 
 type ServiceConfig struct {
-	Store  storage.Storage
-	Scheme string
+	Store storage.Storage
 }
 
 func NewService(cfg *ServiceConfig) *Service {
 	return &Service{
-		store:  cfg.Store,
-		scheme: cfg.Scheme,
+		store: cfg.Store,
 	}
 }
 
@@ -48,6 +45,6 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	w.Header().Set("Location", svc.scheme+"://"+redirect)
+	w.Header().Set("Location", redirect)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
