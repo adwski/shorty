@@ -12,10 +12,10 @@ const (
 )
 
 func ShortenRequest(req *http.Request) (size int, err error) {
-	if req.Header.Get("Content-Type") != "text/plain" {
-		err = errors.New("wrong Content-Type")
-		return
-	}
+	//if req.Header.Get("Content-Type") != "text/plain" {
+	//	err = errors.New("wrong Content-Type")
+	//	return
+	//}
 	if size, err = strconv.Atoi(req.Header.Get("Content-Length")); err != nil {
 		err = errors.New("incorrect Content-Length")
 		return
