@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestNewShorty(t *testing.T) {
+func TestShorty(t *testing.T) {
 
 	cfg := &ShortyConfig{
 		Host:         "xxx.yyy",
