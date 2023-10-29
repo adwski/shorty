@@ -68,6 +68,7 @@ func TestNewShorty(t *testing.T) {
 			// Execute
 			shorty.ServeHTTP(w, r)
 			res = w.Result()
+			defer res.Body.Close()
 
 			// Check status
 			assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
