@@ -14,6 +14,8 @@ import (
 
 const (
 	defaultTimeout = time.Second
+
+	defaultPathLength = 8
 )
 
 type Shorty struct {
@@ -32,7 +34,7 @@ type ShortyConfig struct {
 
 func NewShorty(cfg *ShortyConfig) *Shorty {
 
-	store := simple.NewSimple(&simple.Config{URLLength: 8})
+	store := simple.NewSimple(&simple.Config{PathLength: defaultPathLength})
 	logW := log.StandardLogger().Writer()
 
 	sh := &Shorty{
@@ -47,13 +49,13 @@ func NewShorty(cfg *ShortyConfig) *Shorty {
 			Store: store,
 		}),
 		server: &http.Server{
-			Addr:              ":8080",
+			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultTimeout,
 			ReadHeaderTimeout: defaultTimeout,
 			WriteTimeout:      defaultTimeout,
 			IdleTimeout:       defaultTimeout,
 			MaxHeaderBytes:    8 * http.DefaultMaxHeaderBytes,
-			ErrorLog:          stdLog.New(logW, "server", 0),
+			ErrorLog:          stdLog.New(logW, "shorty", 0),
 		},
 	}
 

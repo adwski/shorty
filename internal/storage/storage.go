@@ -5,4 +5,5 @@ type Storage interface {
 	Store(key string, url string) error
 	StoreUnique(url string) (key string, err error)
 	Dump() (data string)
+	DumpMap() map[string]string
 }

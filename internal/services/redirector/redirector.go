@@ -1,7 +1,6 @@
 package redirector
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/adwski/shorty/internal/storage"
@@ -38,8 +37,9 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 
 	redirect, err = svc.store.Get(req.URL.Path[1:])
 	if err != nil {
-		if errors.Is(err, common.ErrNotFound()) {
-			w.WriteHeader(http.StatusBadRequest) // or NotFound may be?
+		log.WithError(err).Error("cannot get redirect")
+		if err.Error() == common.ErrNotFound().Error() {
+			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}

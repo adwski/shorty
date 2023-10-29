@@ -7,10 +7,6 @@ import (
 	"unicode"
 )
 
-const (
-	pathLength = 8
-)
-
 func ShortenRequest(req *http.Request) (size int, err error) {
 	//if req.Header.Get("Content-Type") != "text/plain" {
 	//	err = errors.New("wrong Content-Type")
@@ -24,10 +20,6 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 }
 
 func Path(path string) (err error) {
-	if len(path) != pathLength+1 {
-		err = errors.New("incorrect length")
-		return
-	}
 	for i := 1; i < len(path); i++ {
 		if !unicode.IsLetter(rune(path[i])) && !unicode.IsDigit(rune(path[i])) {
 			err = errors.New("invalid character in path")

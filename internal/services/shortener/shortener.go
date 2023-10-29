@@ -66,6 +66,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 		log.WithError(err).Error("cannot store url")
 	}
 
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
 		log.WithError(err).Error("error writing body")
