@@ -2,6 +2,6 @@ package common
 
 import "errors"
 
-func ErrErrorNotFound() error {
+func ErrNotFound() error {
 	return errors.New("not found")
 }

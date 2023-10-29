@@ -38,7 +38,7 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 
 	redirect, err = svc.store.Get(req.URL.Path[1:])
 	if err != nil {
-		if errors.Is(err, common.ErrErrorNotFound()) {
+		if errors.Is(err, common.ErrNotFound()) {
 			w.WriteHeader(http.StatusBadRequest) // or NotFound may be?
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)

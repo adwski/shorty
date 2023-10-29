@@ -31,7 +31,7 @@ func (si *Simple) Get(key string) (url string, err error) {
 		ok bool
 	)
 	if url, ok = si.get(key); !ok {
-		err = common.ErrErrorNotFound()
+		err = common.ErrNotFound()
 	}
 	return
 }
