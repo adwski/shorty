@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/go-chi/chi/v5"
 	stdLog "log"
 	"net/http"
 	"time"
@@ -19,10 +20,10 @@ const (
 )
 
 type Shorty struct {
-	shortenerSvc  *shortener.Service
-	redirectorSvc *redirector.Service
-	server        *http.Server
-	store         storage.Storage
+	//shortenerSvc  *shortener.Service
+	//redirectorSvc *redirector.Service
+	server *http.Server
+	store  storage.Storage
 }
 
 type ShortyConfig struct {
@@ -39,15 +40,6 @@ func NewShorty(cfg *ShortyConfig) *Shorty {
 
 	sh := &Shorty{
 		store: store,
-		shortenerSvc: shortener.NewService(&shortener.ServiceConfig{
-			Store:          store,
-			ServedScheme:   cfg.ServedScheme,
-			RedirectScheme: cfg.RedirectScheme,
-			Host:           cfg.Host,
-		}),
-		redirectorSvc: redirector.NewService(&redirector.ServiceConfig{
-			Store: store,
-		}),
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultTimeout,
@@ -59,7 +51,19 @@ func NewShorty(cfg *ShortyConfig) *Shorty {
 		},
 	}
 
-	sh.server.Handler = sh
+	router := chi.NewRouter()
+	router.Get("/{path}", redirector.NewService(&redirector.ServiceConfig{
+		Store: store,
+	}).Redirect)
+	router.Post("/", shortener.NewService(&shortener.ServiceConfig{
+		Store:          store,
+		ServedScheme:   cfg.ServedScheme,
+		RedirectScheme: cfg.RedirectScheme,
+		Host:           cfg.Host,
+	}).Shorten)
+	router.Trace("/printDB", sh.handlePrintDB)
+
+	sh.server.Handler = router
 	return sh
 }
 
@@ -67,25 +71,7 @@ func (sh *Shorty) Run() error {
 	return sh.server.ListenAndServe()
 }
 
-func (sh *Shorty) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		sh.redirectorSvc.Redirect(w, req)
-
-	case http.MethodPost:
-		sh.shortenerSvc.Shorten(w, req)
-
-	case http.MethodTrace:
-		sh.handleDebug(w, req)
-
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-	}
-}
-
-func (sh *Shorty) handleDebug(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/printDB" {
-		log.Debug(sh.store.Dump())
-	}
+func (sh *Shorty) handlePrintDB(w http.ResponseWriter, req *http.Request) {
+	log.Debug(sh.store.Dump())
 	w.WriteHeader(http.StatusNoContent)
 }

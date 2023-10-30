@@ -39,7 +39,7 @@ func TestShorty(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Execute
-			shorty.ServeHTTP(w, r)
+			shorty.server.Handler.ServeHTTP(w, r)
 			res := w.Result()
 
 			// Check status
@@ -66,7 +66,7 @@ func TestShorty(t *testing.T) {
 			w = httptest.NewRecorder()
 
 			// Execute
-			shorty.ServeHTTP(w, r)
+			shorty.server.Handler.ServeHTTP(w, r)
 			res = w.Result()
 			defer res.Body.Close()
 
