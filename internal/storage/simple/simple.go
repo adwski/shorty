@@ -11,7 +11,7 @@ import (
 
 // Simple is an in-memory URL storage
 // based on map[string]string.
-// All map operations is thread-safe
+// All map operations are thread-safe
 type Simple struct {
 	st     map[string]string
 	mux    *sync.Mutex
