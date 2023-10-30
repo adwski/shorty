@@ -31,6 +31,9 @@ func New() (cfg *ShortyConfig, err error) {
 	)
 
 	flag.Parse()
+	*listenAddr = envOverride("SERVER_ADDRESS", *listenAddr)
+	*baseURL = envOverride("BASE_URL", *baseURL)
+
 	//--------------------------------------------------
 	// Configure Logger
 	//--------------------------------------------------
@@ -57,6 +60,13 @@ func New() (cfg *ShortyConfig, err error) {
 		Host:           bURL.Host,
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
+	}
+	return
+}
+
+func envOverride(name, oldVal string) (newVal string) {
+	if newVal = os.Getenv(name); newVal == "" {
+		newVal = oldVal
 	}
 	return
 }
