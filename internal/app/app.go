@@ -22,7 +22,7 @@ const (
 
 // Shorty is URL shortener app
 // It consists of shortener and redirector services
-// Also it needs storage
+// Also it uses key-value storage to store URLs and shortened paths
 type Shorty struct {
 	server *http.Server
 	store  storage.Storage
