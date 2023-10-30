@@ -53,7 +53,7 @@ func New() (cfg *ShortyConfig, err error) {
 	}
 
 	//--------------------------------------------------
-	// Spawn app
+	// Create config
 	//--------------------------------------------------
 	cfg = &ShortyConfig{
 		ListenAddr:     *listenAddr,

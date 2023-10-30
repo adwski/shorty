@@ -2,6 +2,8 @@ package generators
 
 import "math/rand"
 
+// RandString generates random string with specified length
+// from alphanumeric characters.
 func RandString(length uint) string {
 	var (
 		ch int

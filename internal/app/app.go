@@ -20,11 +20,15 @@ const (
 	defaultPathLength = 8
 )
 
+// Shorty is URL shortener app
+// It consists of shortener and redirector services
+// Also it needs storage
 type Shorty struct {
 	server *http.Server
 	store  storage.Storage
 }
 
+// NewShorty creates Shorty instance from config
 func NewShorty(cfg *config.ShortyConfig) *Shorty {
 
 	store := simple.NewSimple(&simple.Config{PathLength: defaultPathLength})

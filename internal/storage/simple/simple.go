@@ -9,6 +9,9 @@ import (
 	"github.com/adwski/shorty/internal/storage/common"
 )
 
+// Simple is an in-memory URL storage
+// based on map[string]string.
+// All map operations is thread-safe
 type Simple struct {
 	st     map[string]string
 	mux    *sync.Mutex
@@ -27,6 +30,7 @@ func NewSimple(cfg *Config) *Simple {
 	}
 }
 
+// Get returns stored URL by specified key
 func (si *Simple) Get(key string) (url string, err error) {
 	var (
 		ok bool
@@ -37,6 +41,8 @@ func (si *Simple) Get(key string) (url string, err error) {
 	return
 }
 
+// Store stores url with specified key. If key already exists in storage
+// the value will be overwritten
 func (si *Simple) Store(key, url string) error {
 	si.mux.Lock()
 	defer si.mux.Unlock()
@@ -44,6 +50,7 @@ func (si *Simple) Store(key, url string) error {
 	return nil
 }
 
+// StoreUnique generates unique key for provided URL and stores it
 func (si *Simple) StoreUnique(url string) (key string, err error) {
 	var (
 		ok bool

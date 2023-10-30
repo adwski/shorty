@@ -24,6 +24,8 @@ func New(cfg *Config) *Service {
 	}
 }
 
+// Redirect reads URL path retrieves corresponding URL from storage
+// and returns 307 response. It performs path validation before calling storage
 func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 	var (
 		redirect string

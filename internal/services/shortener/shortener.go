@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Service is a shortener service
 type Service struct {
 	store          storage.Storage
 	servedScheme   string
@@ -33,6 +34,9 @@ func New(cfg *Config) *Service {
 	}
 }
 
+// Shorten read body bytes (no more than Content-Length), parses URL from it
+// and stores URL in storage. If something wrong with body or Content-Length
+// it returns 400 error. Stored shortened path is sent back to client.
 func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 	var (
 		bodyLength int
