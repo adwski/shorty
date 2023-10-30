@@ -1,12 +1,13 @@
 package app
 
 import (
+	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/services/redirector"
 	"github.com/go-chi/chi/v5"
 	stdLog "log"
 	"net/http"
 	"time"
 
-	"github.com/adwski/shorty/internal/services/redirector"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/storage/simple"
@@ -20,20 +21,11 @@ const (
 )
 
 type Shorty struct {
-	//shortenerSvc  *shortener.Service
-	//redirectorSvc *redirector.Service
 	server *http.Server
 	store  storage.Storage
 }
 
-type ShortyConfig struct {
-	ListenAddr     string
-	Host           string
-	RedirectScheme string
-	ServedScheme   string
-}
-
-func NewShorty(cfg *ShortyConfig) *Shorty {
+func NewShorty(cfg *config.ShortyConfig) *Shorty {
 
 	store := simple.NewSimple(&simple.Config{PathLength: defaultPathLength})
 	logW := log.StandardLogger().Writer()
@@ -52,10 +44,10 @@ func NewShorty(cfg *ShortyConfig) *Shorty {
 	}
 
 	router := chi.NewRouter()
-	router.Get("/{path}", redirector.NewService(&redirector.ServiceConfig{
+	router.Get("/{path}", redirector.New(&redirector.Config{
 		Store: store,
 	}).Redirect)
-	router.Post("/", shortener.NewService(&shortener.ServiceConfig{
+	router.Post("/", shortener.New(&shortener.Config{
 		Store:          store,
 		ServedScheme:   cfg.ServedScheme,
 		RedirectScheme: cfg.RedirectScheme,
@@ -71,7 +63,7 @@ func (sh *Shorty) Run() error {
 	return sh.server.ListenAndServe()
 }
 
-func (sh *Shorty) handlePrintDB(w http.ResponseWriter, req *http.Request) {
+func (sh *Shorty) handlePrintDB(w http.ResponseWriter, _ *http.Request) {
 	log.Debug(sh.store.Dump())
 	w.WriteHeader(http.StatusNoContent)
 }

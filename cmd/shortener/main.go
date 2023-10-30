@@ -1,53 +1,29 @@
 package main
 
 import (
-	"flag"
+	"github.com/adwski/shorty/internal/app"
+	"github.com/adwski/shorty/internal/app/config"
 	"os"
 
-	"github.com/adwski/shorty/internal/app"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 
 	var (
-		err    error
-		lvl    log.Level
-		shorty *app.Shorty
-
-		listenAddr     = flag.String("listen", ":8080", "listen address")
-		scheme         = flag.String("scheme", "http", "server scheme")
-		host           = flag.String("host", "localhost:8080", "server host")
-		redirectScheme = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
-		logLevel       = flag.String("log_level", "debug", "log level")
+		cfg *config.ShortyConfig
+		err error
 	)
 
-	//--------------------------------------------------
-	// Configure Logger
-	//--------------------------------------------------
-	log.SetOutput(os.Stdout)
-
-	if lvl, err = log.ParseLevel(*logLevel); err != nil {
-		log.SetLevel(log.InfoLevel)
-	} else {
-		log.SetLevel(lvl)
+	if cfg, err = config.New(); err != nil {
+		log.WithError(err).Fatal("cannot configure app")
 	}
 
-	//--------------------------------------------------
-	// Spawn app
-	//--------------------------------------------------
-	shorty = app.NewShorty(&app.ShortyConfig{
-		ListenAddr:     *listenAddr,
-		Host:           *host,
-		RedirectScheme: *redirectScheme,
-		ServedScheme:   *scheme,
-	})
-
 	log.WithFields(log.Fields{
-		"address": *listenAddr,
+		"address": cfg.ListenAddr,
 	}).Info("starting app")
 
-	if err = shorty.Run(); err != nil {
+	if err = app.NewShorty(cfg).Run(); err != nil {
 		log.WithError(err).Errorf("server failure")
 		os.Exit(1)
 	}

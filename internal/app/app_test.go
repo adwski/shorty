@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"github.com/adwski/shorty/internal/app/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -14,7 +15,7 @@ import (
 
 func TestShorty(t *testing.T) {
 
-	cfg := &ShortyConfig{
+	cfg := &config.ShortyConfig{
 		Host:         "xxx.yyy",
 		ServedScheme: "http",
 	}

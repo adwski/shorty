@@ -14,11 +14,11 @@ type Service struct {
 	store storage.Storage
 }
 
-type ServiceConfig struct {
+type Config struct {
 	Store storage.Storage
 }
 
-func NewService(cfg *ServiceConfig) *Service {
+func New(cfg *Config) *Service {
 	return &Service{
 		store: cfg.Store,
 	}

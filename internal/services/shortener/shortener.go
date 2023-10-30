@@ -17,14 +17,14 @@ type Service struct {
 	host           string
 }
 
-type ServiceConfig struct {
+type Config struct {
 	Store          storage.Storage
 	ServedScheme   string
 	RedirectScheme string
 	Host           string
 }
 
-func NewService(cfg *ServiceConfig) *Service {
+func New(cfg *Config) *Service {
 	return &Service{
 		store:          cfg.Store,
 		servedScheme:   cfg.ServedScheme,
