@@ -21,9 +21,6 @@ func New() (cfg *ShortyConfig, err error) {
 		lvl  log.Level
 		bURL *url.URL
 
-		//listenAddr     = flag.String("listen", ":8080", "listen address")
-		//scheme         = flag.String("scheme", "http", "server scheme")
-		//host           = flag.String("host", "localhost:8080", "server host")
 		listenAddr     = flag.String("a", ":8080", "listen address")
 		baseURL        = flag.String("b", "http://localhost:8080", "base server URL")
 		redirectScheme = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")

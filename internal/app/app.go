@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/adwski/shorty/internal/services/shortener"
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/storage/simple"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,7 +24,6 @@ const (
 // Also it uses key-value storage to store URLs and shortened paths
 type Shorty struct {
 	server *http.Server
-	store  storage.Storage
 }
 
 // NewShorty creates Shorty instance from config
@@ -35,7 +33,6 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 	logW := log.StandardLogger().Writer()
 
 	sh := &Shorty{
-		store: store,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultTimeout,
@@ -57,7 +54,6 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 		RedirectScheme: cfg.RedirectScheme,
 		Host:           cfg.Host,
 	}).Shorten)
-	router.Trace("/printDB", sh.handlePrintDB)
 
 	sh.server.Handler = router
 	return sh
@@ -65,9 +61,4 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 
 func (sh *Shorty) Run() error {
 	return sh.server.ListenAndServe()
-}
-
-func (sh *Shorty) handlePrintDB(w http.ResponseWriter, _ *http.Request) {
-	log.Debug(sh.store.Dump())
-	w.WriteHeader(http.StatusNoContent)
 }
