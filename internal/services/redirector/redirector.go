@@ -1,10 +1,10 @@
 package redirector
 
 import (
+	"github.com/adwski/shorty/internal/storage/errors"
 	"net/http"
 
 	"github.com/adwski/shorty/internal/storage"
-	"github.com/adwski/shorty/internal/storage/common"
 	"github.com/adwski/shorty/internal/validate"
 	log "github.com/sirupsen/logrus"
 )
@@ -37,12 +37,11 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	redirect, err = svc.store.Get(req.URL.Path[1:])
-	if err != nil {
-		log.WithError(err).Error("cannot get redirect")
-		if err.Error() == common.ErrNotFound().Error() {
+	if redirect, err = svc.store.Get(req.URL.Path[1:]); err != nil {
+		if errors.Equal(err, errors.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
+			log.WithError(err).Error("cannot get redirect")
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return

@@ -94,7 +94,7 @@ func TestService_Redirect(t *testing.T) {
 				store: simple.NewSimple(&simple.Config{PathLength: tt.args.pathLength}),
 			}
 			for k, v := range tt.args.addToStorage {
-				_ = svc.store.Store(k, v)
+				require.Nil(t, svc.store.Store(k, v))
 			}
 
 			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)

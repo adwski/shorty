@@ -20,7 +20,7 @@ func TestPath(t *testing.T) {
 		{
 			name: "invalid path",
 			path: "/qwe$123wetw4",
-			err:  ErrInvalidChar(),
+			err:  ErrInvalidChar,
 		},
 	}
 	for _, tt := range tests {
@@ -60,7 +60,18 @@ func TestShortenRequest(t *testing.T) {
 			name: "missing Content-Length",
 			req:  &http.Request{},
 			want: want{
-				err: ErrContentLength(),
+				err: ErrContentLengthMissing,
+			},
+		},
+		{
+			name: "incorrect Content-Length",
+			req: &http.Request{
+				Header: http.Header{
+					"Content-Length": []string{"qweasd"},
+				},
+			},
+			want: want{
+				err: ErrContentLengthIncorrect,
 			},
 		},
 	}
@@ -71,7 +82,7 @@ func TestShortenRequest(t *testing.T) {
 				assert.Nil(t, err)
 				assert.Equal(t, tt.want.size, size)
 			} else {
-				assert.Equal(t, err.Error(), tt.want.err.Error())
+				assert.ErrorIs(t, err, tt.want.err)
 			}
 		})
 	}

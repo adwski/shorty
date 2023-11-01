@@ -2,7 +2,7 @@ package simple
 
 import (
 	"fmt"
-	"github.com/adwski/shorty/internal/storage/common"
+	"github.com/adwski/shorty/internal/storage/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sync"
@@ -73,7 +73,7 @@ func TestNewSimple_Get(t *testing.T) {
 				key: "aaa",
 				url: "https://bbb.ccc",
 			},
-			err: common.ErrNotFound(),
+			err: errors.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {

@@ -1,6 +1,7 @@
 package shortener
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -68,6 +69,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 	if shortPath, err = svc.store.StoreUnique(srcURL.String()); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.WithError(err).Error("cannot store url")
+		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
@@ -78,7 +80,7 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 }
 
 func (svc *Service) getServedURL(shortPath string) string {
-	return svc.servedScheme + "://" + svc.host + "/" + shortPath
+	return fmt.Sprintf("%s://%s/%s", svc.servedScheme, svc.host, shortPath)
 }
 
 func getRedirectURLFromBody(req *http.Request, bodyLength int) (u *url.URL, err error) {

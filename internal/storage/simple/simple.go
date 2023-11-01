@@ -1,12 +1,10 @@
 package simple
 
 import (
-	"fmt"
+	"github.com/adwski/shorty/internal/storage/errors"
 	"github.com/adwski/shorty/internal/storage/generators"
 	"maps"
 	"sync"
-
-	"github.com/adwski/shorty/internal/storage/common"
 )
 
 // Simple is an in-memory URL storage
@@ -35,8 +33,10 @@ func (si *Simple) Get(key string) (url string, err error) {
 	var (
 		ok bool
 	)
+	si.mux.Lock()
+	defer si.mux.Unlock()
 	if url, ok = si.st[key]; !ok {
-		err = common.ErrNotFound()
+		err = errors.ErrNotFound
 	}
 	return
 }
@@ -65,12 +65,6 @@ func (si *Simple) StoreUnique(url string) (key string, err error) {
 	}
 	si.st[key] = url
 	return
-}
-
-func (si *Simple) Dump() string {
-	si.mux.Lock()
-	defer si.mux.Unlock()
-	return fmt.Sprintf("%v", si.st)
 }
 
 func (si *Simple) DumpMap() map[string]string {

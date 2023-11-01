@@ -7,13 +7,11 @@ import (
 	"unicode"
 )
 
-func ErrInvalidChar() error {
-	return errors.New("invalid character in path")
-}
-
-func ErrContentLength() error {
-	return errors.New("incorrect or missing Content-Length")
-}
+var (
+	ErrInvalidChar            = errors.New("invalid character in path")
+	ErrContentLengthMissing   = errors.New("missing Content-Length")
+	ErrContentLengthIncorrect = errors.New("incorrect Content-Length")
+)
 
 // ShortenRequest validates http request for shorten service
 func ShortenRequest(req *http.Request) (size int, err error) {
@@ -21,9 +19,13 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 	//	err = errors.New("wrong Content-Type")
 	//	return
 	//}
-	if size, err = strconv.Atoi(req.Header.Get("Content-Length")); err != nil {
-		err = ErrContentLength()
+	cl := req.Header.Get("Content-Length")
+	if cl == "" {
+		err = ErrContentLengthMissing
 		return
+	}
+	if size, err = strconv.Atoi(cl); err != nil {
+		err = errors.Join(ErrContentLengthIncorrect, err)
 	}
 	return
 }
@@ -32,7 +34,7 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 func Path(path string) error {
 	for i := 1; i < len(path); i++ {
 		if !unicode.IsLetter(rune(path[i])) && !unicode.IsDigit(rune(path[i])) {
-			return ErrInvalidChar()
+			return ErrInvalidChar
 		}
 	}
 	return nil
