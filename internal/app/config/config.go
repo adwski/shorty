@@ -68,5 +68,4 @@ func envOverride(name string, oldVal *string) {
 	if val, ok := os.LookupEnv(name); ok {
 		*oldVal = val
 	}
-	return
 }
