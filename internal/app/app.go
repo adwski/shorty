@@ -29,22 +29,12 @@ type Shorty struct {
 // NewShorty creates Shorty instance from config
 func NewShorty(cfg *config.ShortyConfig) *Shorty {
 
-	store := simple.NewSimple(&simple.Config{PathLength: defaultPathLength})
-	logW := log.StandardLogger().Writer()
+	var (
+		store  = simple.NewSimple(&simple.Config{PathLength: defaultPathLength})
+		logW   = log.StandardLogger().Writer()
+		router = chi.NewRouter()
+	)
 
-	sh := &Shorty{
-		server: &http.Server{
-			Addr:              cfg.ListenAddr,
-			ReadTimeout:       defaultTimeout,
-			ReadHeaderTimeout: defaultTimeout,
-			WriteTimeout:      defaultTimeout,
-			IdleTimeout:       defaultTimeout,
-			MaxHeaderBytes:    8 * http.DefaultMaxHeaderBytes,
-			ErrorLog:          stdLog.New(logW, "shorty", 0),
-		},
-	}
-
-	router := chi.NewRouter()
 	router.Get("/{path}", redirector.New(&redirector.Config{
 		Store: store,
 	}).Redirect)
@@ -55,8 +45,18 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 		Host:           cfg.Host,
 	}).Shorten)
 
-	sh.server.Handler = router
-	return sh
+	return &Shorty{
+		server: &http.Server{
+			Addr:              cfg.ListenAddr,
+			ReadTimeout:       defaultTimeout,
+			ReadHeaderTimeout: defaultTimeout,
+			WriteTimeout:      defaultTimeout,
+			IdleTimeout:       defaultTimeout,
+			MaxHeaderBytes:    8 * http.DefaultMaxHeaderBytes,
+			ErrorLog:          stdLog.New(logW, "shorty", 0),
+			Handler:           router,
+		},
+	}
 }
 
 func (sh *Shorty) Run() error {
