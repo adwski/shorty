@@ -2,9 +2,27 @@ package generators
 
 import "math/rand"
 
+var (
+	alphabet = []byte("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+)
+
 // RandString generates random string with specified length
-// from alphanumeric characters.
+// from predefined alphabet
 func RandString(length uint) string {
+	var (
+		i  uint
+		b  = make([]byte, length)
+		ln = len(alphabet)
+	)
+	for i = 0; i < length; i++ {
+		b[i] = alphabet[rand.Intn(ln)]
+	}
+	return string(b)
+}
+
+// RandStringOld generates random string with specified length
+// from alphanumeric characters.
+func RandStringOld(length uint) string {
 	var (
 		ch int
 		i  uint

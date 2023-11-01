@@ -40,3 +40,15 @@ func TestRandString(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkRandString(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = RandString(100)
+	}
+}
+
+func BenchmarkRandStringOld(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = RandStringOld(100)
+	}
+}
