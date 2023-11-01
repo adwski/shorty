@@ -28,8 +28,8 @@ func New() (cfg *ShortyConfig, err error) {
 	)
 
 	flag.Parse()
-	*listenAddr = envOverride("SERVER_ADDRESS", *listenAddr)
-	*baseURL = envOverride("BASE_URL", *baseURL)
+	envOverride("SERVER_ADDRESS", listenAddr)
+	envOverride("BASE_URL", baseURL)
 
 	//--------------------------------------------------
 	// Configure Logger
@@ -61,9 +61,12 @@ func New() (cfg *ShortyConfig, err error) {
 	return
 }
 
-func envOverride(name, oldVal string) (newVal string) {
-	if newVal = os.Getenv(name); newVal == "" {
-		newVal = oldVal
+func envOverride(name string, oldVal *string) {
+	if oldVal == nil {
+		return
+	}
+	if val, ok := os.LookupEnv(name); ok {
+		*oldVal = val
 	}
 	return
 }
