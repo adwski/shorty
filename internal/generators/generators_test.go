@@ -46,21 +46,3 @@ func BenchmarkRandString(b *testing.B) {
 		_ = RandString(100)
 	}
 }
-
-func BenchmarkRandStringOld(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = RandStringOld(100)
-	}
-}
-
-func BenchmarkRandStringOldV2(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = RandStringOldV2(100)
-	}
-}
-
-func BenchmarkRandStringOldV3(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = RandStringOldV3(100)
-	}
-}
