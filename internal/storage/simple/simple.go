@@ -2,7 +2,6 @@ package simple
 
 import (
 	"github.com/adwski/shorty/internal/errors"
-	"maps"
 	"sync"
 )
 
@@ -44,12 +43,4 @@ func (si *Simple) Store(key, url string, overwrite bool) error {
 	}
 	si.st[key] = url
 	return nil
-}
-
-func (si *Simple) DumpMap() map[string]string {
-	si.mux.Lock()
-	defer si.mux.Unlock()
-	dump := make(map[string]string)
-	maps.Copy(dump, si.st)
-	return dump
 }
