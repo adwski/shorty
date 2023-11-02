@@ -1,12 +1,12 @@
 package simple
 
 import (
-	"fmt"
-	"github.com/adwski/shorty/internal/storage/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
+
+	"github.com/adwski/shorty/internal/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewSimple(t *testing.T) {
@@ -26,13 +26,13 @@ func TestNewSimple(t *testing.T) {
 				key: "aaa",
 				url: "https://bbb.ccc",
 			},
-			si: NewSimple(&Config{PathLength: 10}),
+			si: NewSimple(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			err := tt.si.Store(tt.args.key, tt.args.url)
+			err := tt.si.Store(tt.args.key, tt.args.url, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -98,31 +98,46 @@ func TestNewSimple_Get(t *testing.T) {
 
 func TestNewSimple_Store(t *testing.T) {
 	type args struct {
-		key      string
-		url      string
-		beforeDB map[string]string
-		wantDB   map[string]string
+		key       string
+		url       string
+		beforeDB  map[string]string
+		wantDB    map[string]string
+		wantErr   error
+		overwrite bool
 	}
 	tests := []struct {
 		name string
 		args args
 	}{
 		{
-			name: "store existing",
+			name: "store existing with overwrite",
 			args: args{
-				key:      "aaa",
-				url:      "https://ddd.eee",
-				beforeDB: map[string]string{"aaa": "https://bbb.ccc"},
-				wantDB:   map[string]string{"aaa": "https://ddd.eee"},
+				key:       "aaa",
+				url:       "https://ddd.eee",
+				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
+				wantDB:    map[string]string{"aaa": "https://ddd.eee"},
+				overwrite: true,
+			},
+		},
+		{
+			name: "store existing without overwrite",
+			args: args{
+				key:       "aaa",
+				url:       "https://ddd.eee",
+				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
+				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
+				wantErr:   errors.ErrAlreadyExists,
+				overwrite: false,
 			},
 		},
 		{
 			name: "store not existing",
 			args: args{
-				key:      "aaa",
-				url:      "https://bbb.ccc",
-				beforeDB: map[string]string{},
-				wantDB:   map[string]string{"aaa": "https://bbb.ccc"},
+				key:       "aaa",
+				url:       "https://bbb.ccc",
+				beforeDB:  map[string]string{},
+				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
+				overwrite: false,
 			},
 		},
 	}
@@ -134,54 +149,15 @@ func TestNewSimple_Store(t *testing.T) {
 				mux: &sync.Mutex{},
 			}
 
-			err := si.Store(tt.args.key, tt.args.url)
+			err := si.Store(tt.args.key, tt.args.url, tt.args.overwrite)
 
-			require.NoError(t, err)
+			if tt.args.wantErr != nil {
+				require.NotNil(t, err)
+				assert.Equal(t, tt.args.wantErr.Error(), err.Error())
+			} else {
+				require.Nil(t, err)
+			}
 			assert.Equal(t, tt.args.wantDB, si.st)
-
-		})
-	}
-}
-
-func TestNewSimple_StoreUnique(t *testing.T) {
-	type args struct {
-		url        string
-		runs       int
-		pathLength uint
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "store",
-			args: args{
-				url:        "https://ddd.eee",
-				runs:       1000,
-				pathLength: 10,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			si := NewSimple(&Config{PathLength: tt.args.pathLength})
-			keys := make([]string, 0, tt.args.runs)
-			for i := 0; i < tt.args.runs; i++ {
-				key, err := si.StoreUnique(fmt.Sprintf("%s%d", tt.args.url, i))
-				require.NoError(t, err)
-				require.NotEmpty(t, key)
-				require.Equal(t, tt.args.pathLength, uint(len(key)))
-				for _, k := range keys {
-					require.NotEqual(t, k, key)
-				}
-				keys = append(keys, key)
-			}
-			for i, k := range keys {
-				url, err := si.Get(k)
-				require.NoError(t, err, fmt.Sprintf("key is %s", k))
-				assert.Equal(t, fmt.Sprintf("%s%d", tt.args.url, i), url)
-			}
 		})
 	}
 }

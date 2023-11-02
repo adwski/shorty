@@ -1,26 +1,29 @@
 package redirector
 
 import (
-	"github.com/adwski/shorty/internal/storage/errors"
 	"net/http"
 
+	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Service is redirector service
 type Service struct {
 	store storage.Storage
+	log   *logrus.Logger
 }
 
 type Config struct {
-	Store storage.Storage
+	Store  storage.Storage
+	Logger *logrus.Logger
 }
 
 func New(cfg *Config) *Service {
 	return &Service{
 		store: cfg.Store,
+		log:   cfg.Logger,
 	}
 }
 
@@ -33,7 +36,7 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 	)
 	if err = validate.Path(req.URL.Path); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.WithError(err).Error("redirect path is not valid")
+		svc.log.WithError(err).Error("redirect path is not valid")
 		return
 	}
 
@@ -41,7 +44,7 @@ func (svc *Service) Redirect(w http.ResponseWriter, req *http.Request) {
 		if errors.Equal(err, errors.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
-			log.WithError(err).Error("cannot get redirect")
+			svc.log.WithError(err).Error("cannot get redirect")
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return

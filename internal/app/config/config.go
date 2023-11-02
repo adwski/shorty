@@ -3,9 +3,10 @@ package config
 import (
 	"errors"
 	"flag"
-	log "github.com/sirupsen/logrus"
 	"net/url"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 type ShortyConfig struct {
@@ -13,6 +14,7 @@ type ShortyConfig struct {
 	Host           string
 	RedirectScheme string
 	ServedScheme   string
+	Logger         *logrus.Logger
 }
 
 func New() (*ShortyConfig, error) {
@@ -34,12 +36,13 @@ func New() (*ShortyConfig, error) {
 	//--------------------------------------------------
 	// Configure Logger
 	//--------------------------------------------------
-	log.SetOutput(os.Stdout)
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
 
-	if lvl, err := log.ParseLevel(*logLevel); err != nil {
-		log.SetLevel(log.InfoLevel)
+	if lvl, err := logrus.ParseLevel(*logLevel); err != nil {
+		logger.SetLevel(logrus.InfoLevel)
 	} else {
-		log.SetLevel(lvl)
+		logger.SetLevel(lvl)
 	}
 
 	//--------------------------------------------------
@@ -58,6 +61,7 @@ func New() (*ShortyConfig, error) {
 		Host:           bURL.Host,
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
+		Logger:         logger,
 	}, nil
 }
 

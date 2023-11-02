@@ -1,13 +1,15 @@
 package redirector
 
 import (
-	"github.com/adwski/shorty/internal/storage/simple"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/adwski/shorty/internal/storage"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestService_Redirect(t *testing.T) {
@@ -91,10 +93,11 @@ func TestService_Redirect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &Service{
-				store: simple.NewSimple(&simple.Config{PathLength: tt.args.pathLength}),
+				store: storage.NewStorageSimple(),
+				log:   logrus.New(),
 			}
 			for k, v := range tt.args.addToStorage {
-				require.Nil(t, svc.store.Store(k, v))
+				require.Nil(t, svc.store.Store(k, v, true))
 			}
 
 			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)

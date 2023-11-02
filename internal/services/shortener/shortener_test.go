@@ -2,15 +2,17 @@ package shortener
 
 import (
 	"bytes"
-	"github.com/adwski/shorty/internal/storage/simple"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
+
+	"github.com/adwski/shorty/internal/storage"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestService_Shorten(t *testing.T) {
@@ -99,9 +101,9 @@ func TestService_Shorten(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			// Prepare storage
-			simpleStore := simple.NewSimple(&simple.Config{PathLength: tt.args.pathLength})
+			simpleStore := storage.NewStorageSimple()
 			for k, v := range tt.args.addToStorage {
-				_ = simpleStore.Store(k, v)
+				_ = simpleStore.Store(k, v, true)
 			}
 
 			// Create Shortener
@@ -109,7 +111,9 @@ func TestService_Shorten(t *testing.T) {
 				host:           tt.args.host,
 				servedScheme:   tt.args.servedScheme,
 				redirectScheme: tt.args.redirectScheme,
+				pathLength:     tt.args.pathLength,
 				store:          simpleStore,
+				log:            logrus.New(),
 			}
 
 			// Prepare request
@@ -150,9 +154,9 @@ func TestService_Shorten(t *testing.T) {
 			require.Equal(t, u.Host, tt.args.host)
 
 			// Check storage content
-			storage := simpleStore.DumpMap()
-			require.Contains(t, storage, u.Path[1:])
-			assert.Equal(t, storage[u.Path[1:]], string(tt.args.body))
+			storedURL, err3 := simpleStore.Get(u.Path[1:])
+			require.NoError(t, err3)
+			assert.Equal(t, string(tt.args.body), storedURL)
 		})
 	}
 }

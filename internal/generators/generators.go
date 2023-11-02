@@ -9,12 +9,21 @@ var (
 // RandString generates random string with specified length
 // from predefined alphabet
 func RandString(length uint) string {
+	b := make([]byte, length)
+	for i := uint(0); i < length; i++ {
+		b[i] = alphabet[rand.Intn(len(alphabet))]
+	}
+	return string(b)
+}
+
+// RandStringOldV3 generates random string with specified length
+// from predefined alphabet
+func RandStringOldV3(length uint) string {
 	var (
-		i  uint
 		b  = make([]byte, length)
 		ln = len(alphabet)
 	)
-	for i = 0; i < length; i++ {
+	for i := uint(0); i < length; i++ {
 		b[i] = alphabet[rand.Intn(ln)]
 	}
 	return string(b)
@@ -30,6 +39,26 @@ func RandStringOld(length uint) string {
 	)
 	for i = 0; i < length; i++ {
 		ch = rand.Intn(62)
+		if ch < 10 {
+			// [0-9]
+			b[i] = byte(ch + 48)
+		} else if ch < 36 {
+			// [A-Z]
+			b[i] = byte(ch + 55)
+		} else {
+			// [a-z]
+			b[i] = byte(ch + 61)
+		}
+	}
+	return string(b)
+}
+
+// RandStringOldV2 generates random string with specified length
+// from alphanumeric characters.
+func RandStringOldV2(length uint) string {
+	b := make([]byte, length)
+	for i := uint(0); i < length; i++ {
+		ch := rand.Intn(62)
 		if ch < 10 {
 			// [0-9]
 			b[i] = byte(ch + 48)

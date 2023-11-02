@@ -15,10 +15,6 @@ var (
 
 // ShortenRequest validates http request for shorten service
 func ShortenRequest(req *http.Request) (size int, err error) {
-	//if req.Header.Get("Content-Type") != "text/plain" {
-	//	err = errors.New("wrong Content-Type")
-	//	return
-	//}
 	cl := req.Header.Get("Content-Length")
 	if cl == "" {
 		err = ErrContentLengthMissing

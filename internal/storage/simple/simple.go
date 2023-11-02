@@ -1,8 +1,7 @@
 package simple
 
 import (
-	"github.com/adwski/shorty/internal/storage/errors"
-	"github.com/adwski/shorty/internal/storage/generators"
+	"github.com/adwski/shorty/internal/errors"
 	"maps"
 	"sync"
 )
@@ -11,20 +10,14 @@ import (
 // based on map[string]string.
 // All map operations are thread-safe
 type Simple struct {
-	st     map[string]string
-	mux    *sync.Mutex
-	keyLen uint
+	st  map[string]string
+	mux *sync.Mutex
 }
 
-type Config struct {
-	PathLength uint
-}
-
-func NewSimple(cfg *Config) *Simple {
+func NewSimple() *Simple {
 	return &Simple{
-		st:     make(map[string]string),
-		mux:    &sync.Mutex{},
-		keyLen: cfg.PathLength,
+		st:  make(map[string]string),
+		mux: &sync.Mutex{},
 	}
 }
 
@@ -43,28 +36,14 @@ func (si *Simple) Get(key string) (url string, err error) {
 
 // Store stores url with specified key. If key already exists in storage
 // the value will be overwritten
-func (si *Simple) Store(key, url string) error {
+func (si *Simple) Store(key, url string, overwrite bool) error {
 	si.mux.Lock()
 	defer si.mux.Unlock()
-	si.st[key] = url
-	return nil
-}
-
-// StoreUnique generates unique key for provided URL and stores it
-func (si *Simple) StoreUnique(url string) (key string, err error) {
-	var (
-		ok bool
-	)
-	si.mux.Lock()
-	defer si.mux.Unlock()
-	for {
-		key = generators.RandString(si.keyLen)
-		if _, ok = si.st[key]; !ok {
-			break
-		}
+	if _, ok := si.st[key]; ok && !overwrite {
+		return errors.ErrAlreadyExists
 	}
 	si.st[key] = url
-	return
+	return nil
 }
 
 func (si *Simple) DumpMap() map[string]string {
