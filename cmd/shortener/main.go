@@ -14,6 +14,6 @@ func main() {
 	}
 
 	if err = app.NewShorty(cfg).Run(); err != nil {
-		logrus.WithError(err).Fatal("server failure")
+		cfg.Logger.WithError(err).Fatal("server failure")
 	}
 }
