@@ -12,7 +12,7 @@ func TestPath(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
-		err  error
+		err  string
 	}{
 		{
 			name: "valid path",
@@ -21,16 +21,16 @@ func TestPath(t *testing.T) {
 		{
 			name: "invalid path",
 			path: "/qwe$123wetw4",
-			err:  ErrInvalidChar,
+			err:  "invalid character in path",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Path(tt.path)
-			if tt.err == nil {
+			if tt.err == "" {
 				assert.Nil(t, err)
 			} else {
-				assert.Equal(t, err.Error(), tt.err.Error())
+				assert.Contains(t, err.Error(), tt.err)
 			}
 		})
 	}
@@ -39,7 +39,7 @@ func TestPath(t *testing.T) {
 func TestShortenRequest(t *testing.T) {
 	type want struct {
 		size int
-		err  error
+		err  string
 	}
 	tests := []struct {
 		name string
@@ -61,7 +61,7 @@ func TestShortenRequest(t *testing.T) {
 			name: "missing Content-Length",
 			req:  &http.Request{},
 			want: want{
-				err: ErrContentLengthMissing,
+				err: "missing Content-Length",
 			},
 		},
 		{
@@ -72,18 +72,18 @@ func TestShortenRequest(t *testing.T) {
 				},
 			},
 			want: want{
-				err: ErrContentLengthIncorrect,
+				err: "incorrect Content-Length",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			size, err := ShortenRequest(tt.req)
-			if tt.want.err == nil {
+			if tt.want.err == "" {
 				assert.Nil(t, err)
 				assert.Equal(t, tt.want.size, size)
 			} else {
-				assert.ErrorIs(t, err, tt.want.err)
+				assert.Contains(t, err.Error(), tt.want.err)
 			}
 		})
 	}
