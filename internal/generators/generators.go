@@ -1,6 +1,8 @@
 package generators
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 var (
 	alphabet = []byte("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

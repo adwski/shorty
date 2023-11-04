@@ -1,4 +1,4 @@
-package redirector
+package resolver
 
 import (
 	"io"
@@ -102,7 +102,7 @@ func TestService_Redirect(t *testing.T) {
 
 			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)
 			w := httptest.NewRecorder()
-			svc.Redirect(w, r)
+			svc.Resolve(w, r)
 
 			res := w.Result()
 

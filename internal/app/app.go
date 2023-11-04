@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/adwski/shorty/internal/app/config"
-	"github.com/adwski/shorty/internal/services/redirector"
+	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -38,10 +38,10 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 		router = chi.NewRouter()
 	)
 
-	router.Get("/{path}", redirector.New(&redirector.Config{
+	router.Get("/{path}", resolver.New(&resolver.Config{
 		Store:  store,
 		Logger: cfg.Logger,
-	}).Redirect)
+	}).Resolve)
 	router.Post("/", shortener.New(&shortener.Config{
 		Store:          store,
 		ServedScheme:   cfg.ServedScheme,
