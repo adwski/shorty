@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Service is redirector service
+// Service is resolver service
 type Service struct {
 	store storage.Storage
 	log   *logrus.Logger

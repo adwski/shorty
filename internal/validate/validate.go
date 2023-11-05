@@ -16,12 +16,12 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 		return
 	}
 	if size, err = strconv.Atoi(cl); err != nil {
-		err = errors.Join(errors.New("incorrect Content-Length"), err)
+		err = fmt.Errorf("incorrect Content-Length: %w", err)
 	}
 	return
 }
 
-// Path validates http request path for redirector service
+// Path validates http request path for resolver service
 func Path(path string) error {
 	for i := 1; i < len(path); i++ {
 		if !unicode.IsLetter(rune(path[i])) && !unicode.IsDigit(rune(path[i])) {
