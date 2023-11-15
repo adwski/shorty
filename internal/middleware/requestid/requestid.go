@@ -31,13 +31,13 @@ func (mw *Middleware) Chain(h http.Handler) *Middleware {
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if mw.gen != nil {
-		mw.setRequestId(r)
+		mw.setRequestID(r)
 	}
 
 	mw.handler.ServeHTTP(w, r)
 }
 
-func (mw *Middleware) setRequestId(r *http.Request) {
+func (mw *Middleware) setRequestID(r *http.Request) {
 	u, err := mw.gen.NewV4()
 	if err != nil {
 		// error will happen only if ReadFull() fails

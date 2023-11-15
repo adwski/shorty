@@ -58,11 +58,11 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		start = time.Now()
-		reqId = r.Header.Get("X-Request-ID")
+		reqID = r.Header.Get("X-Request-ID")
 	)
 
 	mw.log.Info("request",
-		zap.String("id", reqId),
+		zap.String("id", reqID),
 		zap.String("method", r.Method),
 		zap.String("uri", r.URL.Path))
 
@@ -71,7 +71,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mw.handler.ServeHTTP(rw, r)
 
 	mw.log.Info("response",
-		zap.String("id", reqId),
+		zap.String("id", reqID),
 		zap.Int("status", rw.status),
 		zap.Int("size", rw.size),
 		zap.Duration("duration", time.Since(start)))

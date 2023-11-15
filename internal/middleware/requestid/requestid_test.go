@@ -21,10 +21,10 @@ func (s *stub) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
 func TestMiddleware(t *testing.T) {
 	type args struct {
 		generate      bool
-		incomingReqId string
+		incomingReqID string
 	}
 	type want struct {
-		newReqId bool
+		newReqID bool
 	}
 	tests := []struct {
 		name string
@@ -37,37 +37,37 @@ func TestMiddleware(t *testing.T) {
 				generate: true,
 			},
 			want: want{
-				newReqId: true,
+				newReqID: true,
 			},
 		},
 		{
 			name: "generate new request id",
 			args: args{
 				generate:      true,
-				incomingReqId: "qweqwe",
+				incomingReqID: "qweqwe",
 			},
 			want: want{
-				newReqId: true,
+				newReqID: true,
 			},
 		},
 		{
 			name: "keep request id",
 			args: args{
 				generate:      false,
-				incomingReqId: "qweqwe",
+				incomingReqID: "qweqwe",
 			},
 			want: want{
-				newReqId: false,
+				newReqID: false,
 			},
 		},
 		{
 			name: "empty request id",
 			args: args{
 				generate:      false,
-				incomingReqId: "",
+				incomingReqID: "",
 			},
 			want: want{
-				newReqId: false,
+				newReqID: false,
 			},
 		},
 	}
@@ -76,22 +76,22 @@ func TestMiddleware(t *testing.T) {
 			mw := New(&Config{Generate: tt.args.generate})
 
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
-			if tt.args.incomingReqId != "" {
-				r.Header.Set("X-Request-ID", tt.args.incomingReqId)
+			if tt.args.incomingReqID != "" {
+				r.Header.Set("X-Request-ID", tt.args.incomingReqID)
 			}
 			s := &stub{}
 			mw.Chain(s)
 			mw.ServeHTTP(nil, r)
 
-			reqId := s.r.Header.Get("X-Request-ID")
+			reqID := s.r.Header.Get("X-Request-ID")
 
 			require.True(t, s.wasCalled)
 
-			if tt.want.newReqId {
-				assert.NotEmpty(t, reqId)
-				assert.NotEqual(t, tt.args.incomingReqId, reqId)
+			if tt.want.newReqID {
+				assert.NotEmpty(t, reqID)
+				assert.NotEqual(t, tt.args.incomingReqID, reqID)
 			} else {
-				assert.Equal(t, tt.args.incomingReqId, reqId)
+				assert.Equal(t, tt.args.incomingReqID, reqID)
 			}
 		})
 	}

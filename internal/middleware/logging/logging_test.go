@@ -45,11 +45,11 @@ func newLogger(w io.Writer) *zap.Logger {
 }
 
 type LogMessage struct {
-	Id       string   `json:"id"`
+	ID       string   `json:"id"`
 	Level    string   `json:"level"`
 	Msg      string   `json:"msg"`
 	Method   string   `json:"method"`
-	Uri      string   `json:"uri"`
+	URI      string   `json:"uri"`
 	Size     int      `json:"size"`
 	Status   int      `json:"status"`
 	Duration Duration `json:"duration"`
@@ -145,7 +145,7 @@ func TestMiddleware(t *testing.T) {
 
 			assert.Equal(t, "request", logFields.Msg)
 			assert.Equal(t, tt.args.method, logFields.Method)
-			assert.Equal(t, tt.args.path, logFields.Uri)
+			assert.Equal(t, tt.args.path, logFields.URI)
 
 			line2, err2 := logOut.ReadBytes('\n')
 			require.Nil(t, err2)

@@ -14,7 +14,7 @@ type ShortyConfig struct {
 	Host           string
 	RedirectScheme string
 	ServedScheme   string
-	GenerateReqId  bool
+	GenerateReqID  bool
 	Logger         *zap.Logger
 }
 
@@ -25,7 +25,7 @@ func New() (*ShortyConfig, error) {
 		baseURL        = flag.String("b", "http://localhost:8080", "base server URL")
 		redirectScheme = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
 		logLevel       = flag.String("log_level", "debug", "log level")
-		trustRequestId = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
+		trustRequestID = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
 
@@ -68,7 +68,7 @@ func New() (*ShortyConfig, error) {
 		Host:           bURL.Host,
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
-		GenerateReqId:  !*trustRequestId,
+		GenerateReqID:  !*trustRequestID,
 		Logger:         logger,
 	}, nil
 }

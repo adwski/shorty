@@ -62,7 +62,7 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 			IdleTimeout:       defaultIdleTimeout,
 			ErrorLog:          zap.NewStdLog(cfg.Logger),
 
-			Handler: requestid.New(&requestid.Config{Generate: cfg.GenerateReqId}).Chain(
+			Handler: requestid.New(&requestid.Config{Generate: cfg.GenerateReqID}).Chain(
 				logging.New(&logging.Config{Logger: cfg.Logger}).Chain(router)),
 		},
 	}
