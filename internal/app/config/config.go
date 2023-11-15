@@ -3,10 +3,10 @@ package config
 import (
 	"errors"
 	"flag"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"net/url"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
 type ShortyConfig struct {
@@ -14,7 +14,8 @@ type ShortyConfig struct {
 	Host           string
 	RedirectScheme string
 	ServedScheme   string
-	Logger         *logrus.Logger
+	GenerateReqId  bool
+	Logger         *zap.Logger
 }
 
 func New() (*ShortyConfig, error) {
@@ -24,6 +25,7 @@ func New() (*ShortyConfig, error) {
 		baseURL        = flag.String("b", "http://localhost:8080", "base server URL")
 		redirectScheme = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
 		logLevel       = flag.String("log_level", "debug", "log level")
+		trustRequestId = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
 
@@ -36,14 +38,19 @@ func New() (*ShortyConfig, error) {
 	//--------------------------------------------------
 	// Configure Logger
 	//--------------------------------------------------
-	logger := logrus.New()
-	logger.SetOutput(os.Stdout)
-
-	if lvl, err := logrus.ParseLevel(*logLevel); err != nil {
-		logger.SetLevel(logrus.InfoLevel)
-	} else {
-		logger.SetLevel(lvl)
+	lvl, err := zapcore.ParseLevel(*logLevel)
+	if err != nil {
+		lvl = zapcore.InfoLevel
 	}
+	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+		MessageKey:     "msg",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+	})
+	logger := zap.New(zapcore.NewCore(encoder, os.Stdout, lvl))
 
 	//--------------------------------------------------
 	// Parse server URL
@@ -61,6 +68,7 @@ func New() (*ShortyConfig, error) {
 		Host:           bURL.Host,
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
+		GenerateReqId:  !*trustRequestId,
 		Logger:         logger,
 	}, nil
 }

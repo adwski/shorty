@@ -2,6 +2,7 @@ package shortener
 
 import (
 	"bytes"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/adwski/shorty/internal/storage"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,6 @@ func TestService_Shorten(t *testing.T) {
 	type want struct {
 		status    int
 		headers   map[string]string
-		storage   map[string]string
 		emptyBody bool
 	}
 	tests := []struct {
@@ -113,7 +112,7 @@ func TestService_Shorten(t *testing.T) {
 				redirectScheme: tt.args.redirectScheme,
 				pathLength:     tt.args.pathLength,
 				store:          simpleStore,
-				log:            logrus.New(),
+				log:            zap.NewExample(),
 			}
 
 			// Prepare request

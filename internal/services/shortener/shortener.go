@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/generators"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -23,7 +23,7 @@ type Service struct {
 	servedScheme   string
 	redirectScheme string
 	host           string
-	log            *logrus.Logger
+	log            *zap.Logger
 	pathLength     uint
 }
 
@@ -32,7 +32,7 @@ type Config struct {
 	ServedScheme   string
 	RedirectScheme string
 	Host           string
-	Logger         *logrus.Logger
+	Logger         *zap.Logger
 	PathLength     uint
 }
 
@@ -59,35 +59,34 @@ func (svc *Service) Shorten(w http.ResponseWriter, req *http.Request) {
 	)
 	if bodyLength, err = validate.ShortenRequest(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.WithError(err).Error("shorten request is not valid")
+		svc.log.Error("shorten request is not valid", zap.Error(err))
 		return
 	}
 
 	if srcURL, err = getRedirectURLFromBody(req, bodyLength); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.WithError(err).Error("url is not valid")
+		svc.log.Error("url is not valid", zap.Error(err))
 		return
 	}
 
 	if svc.redirectScheme != "" && srcURL.Scheme != svc.redirectScheme {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.WithFields(logrus.Fields{
-			"scheme":    srcURL.Scheme,
-			"supported": svc.redirectScheme,
-		}).Error("scheme is not supported")
+		svc.log.Error("scheme is not supported",
+			zap.String("scheme", srcURL.Scheme),
+			zap.String("supported", svc.redirectScheme))
 		return
 	}
 
 	if shortPath, err = svc.storeURL(srcURL.String()); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.WithError(err).Error("cannot store url")
+		svc.log.Error("cannot store url", zap.Error(err))
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
-		svc.log.WithError(err).Error("error writing body")
+		svc.log.Error("error writing body", zap.Error(err))
 	}
 }
 

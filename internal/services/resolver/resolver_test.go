@@ -1,13 +1,13 @@
 package resolver
 
 import (
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/adwski/shorty/internal/storage"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +94,7 @@ func TestService_Redirect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &Service{
 				store: storage.NewStorageSimple(),
-				log:   logrus.New(),
+				log:   zap.NewExample(),
 			}
 			for k, v := range tt.args.addToStorage {
 				require.Nil(t, svc.store.Store(k, v, true))

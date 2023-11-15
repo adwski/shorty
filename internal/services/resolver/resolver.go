@@ -1,23 +1,23 @@
 package resolver
 
 import (
+	"go.uber.org/zap"
 	"net/http"
 
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
-	"github.com/sirupsen/logrus"
 )
 
 // Service is resolver service
 type Service struct {
 	store storage.Storage
-	log   *logrus.Logger
+	log   *zap.Logger
 }
 
 type Config struct {
 	Store  storage.Storage
-	Logger *logrus.Logger
+	Logger *zap.Logger
 }
 
 func New(cfg *Config) *Service {
@@ -36,7 +36,7 @@ func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 	)
 	if err = validate.Path(req.URL.Path); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.WithError(err).Error("redirect path is not valid")
+		svc.log.Error("redirect path is not valid", zap.Error(err))
 		return
 	}
 
@@ -44,7 +44,7 @@ func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 		if errors.Equal(err, errors.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
-			svc.log.WithError(err).Error("cannot get redirect")
+			svc.log.Error("cannot get redirect", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return

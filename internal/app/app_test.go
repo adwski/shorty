@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/adwski/shorty/internal/app/config"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestShorty(t *testing.T) {
 	cfg := &config.ShortyConfig{
 		Host:         "xxx.yyy",
 		ServedScheme: "http",
-		Logger:       logrus.New(),
+		Logger:       zap.NewExample(),
 	}
 	shorty := NewShorty(cfg)
 

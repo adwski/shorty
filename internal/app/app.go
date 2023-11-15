@@ -1,7 +1,8 @@
 package app
 
 import (
-	"log"
+	"github.com/adwski/shorty/internal/middleware/logging"
+	"github.com/adwski/shorty/internal/middleware/requestid"
 	"net/http"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 // It consists of shortener and redirector services
 // Also it uses key-value storage to store URLs and shortened paths
 type Shorty struct {
-	log    *logrus.Logger
+	log    *zap.Logger
 	server *http.Server
 }
 
@@ -59,16 +60,17 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 			WriteTimeout:      defaultWriteTimeout,
 			IdleTimeout:       defaultIdleTimeout,
-			ErrorLog:          log.New(cfg.Logger.Writer(), "shorty", 0),
-			Handler:           router,
+			ErrorLog:          zap.NewStdLog(cfg.Logger),
+
+			Handler: requestid.New(&requestid.Config{Generate: cfg.GenerateReqId}).Chain(
+				logging.New(&logging.Config{Logger: cfg.Logger}).Chain(router)),
 		},
 	}
 }
 
 func (sh *Shorty) Run() error {
-	sh.log.WithFields(logrus.Fields{
-		"address": sh.server.Addr,
-	}).Info("starting app")
+	sh.log.Info("starting app",
+		zap.String("address", sh.server.Addr))
 
 	return sh.server.ListenAndServe()
 }
