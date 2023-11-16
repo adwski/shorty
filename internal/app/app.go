@@ -39,18 +39,24 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 		router = chi.NewRouter()
 	)
 
-	router.Get("/{path}", resolver.New(&resolver.Config{
-		Store:  store,
-		Logger: cfg.Logger,
-	}).Resolve)
-	router.Post("/", shortener.New(&shortener.Config{
+	shortenerSvc := shortener.New(&shortener.Config{
 		Store:          store,
 		ServedScheme:   cfg.ServedScheme,
 		RedirectScheme: cfg.RedirectScheme,
 		Host:           cfg.Host,
 		Logger:         cfg.Logger,
 		PathLength:     defaultPathLength,
-	}).Shorten)
+	})
+
+	resolverSvc := resolver.New(&resolver.Config{
+		Store:  store,
+		Logger: cfg.Logger,
+	})
+
+	router.Post("/", shortenerSvc.ShortenPlain)
+	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
+
+	router.Get("/{path}", resolverSvc.Resolve)
 
 	return &Shorty{
 		log: cfg.Logger,
