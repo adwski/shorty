@@ -1,7 +1,8 @@
 package shortener
 
 import (
-	errs "errors"
+	"compress/gzip"
+	"compress/zlib"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,32 +50,39 @@ func (svc *Service) storeURL(u string) (path string, err error) {
 	return
 }
 
-func getRedirectURLFromBody(req *http.Request, bodyLength int) (*url.URL, error) {
-	body, err := readBody(req, bodyLength)
+func getRedirectURLFromBody(req *http.Request) (*url.URL, error) {
+	body, err := readBody(req)
 	if err != nil {
 		return nil, err
 	}
 	return url.Parse(string(body))
 }
 
-func readBody(req *http.Request, bodyLength int) (body []byte, err error) {
+func readBody(req *http.Request) (body []byte, err error) {
 	var (
-		n, readBytes int
+		r io.ReadCloser
 	)
-	body = make([]byte, bodyLength)
 	defer func() { _ = req.Body.Close() }()
-	for {
-		if n, err = req.Body.Read(body); err != nil {
-			if errs.Is(err, io.EOF) {
-				err = nil
-				break
-			}
-			return
-		}
-		readBytes += n
-		if readBytes >= bodyLength || n == 0 {
-			break
-		}
+
+	if r, err = readBodyContent(req); err != nil {
+		return
+	}
+	defer func() { _ = r.Close() }()
+
+	body, err = io.ReadAll(r)
+	return
+}
+
+func readBodyContent(req *http.Request) (r io.ReadCloser, err error) {
+	switch req.Header.Get("Content-Encoding") {
+	case "gzip":
+		r, err = gzip.NewReader(req.Body)
+	case "deflate":
+		r, err = zlib.NewReader(req.Body)
+	case "":
+		r = req.Body
+	default:
+		err = errors.ErrUnknownEncoding
 	}
 	return
 }

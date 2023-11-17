@@ -22,12 +22,10 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 }
 
 // ShortenRequestJSON validates http request for shorten service json endpoint
-func ShortenRequestJSON(req *http.Request) (size int, err error) {
+func ShortenRequestJSON(req *http.Request) (err error) {
 	if req.Header.Get("Content-Type") != "application/json" {
 		err = errors.New("incorrect Content-Type")
-		return
 	}
-	size, err = ShortenRequest(req)
 	return
 }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
 	"net/http"
@@ -29,6 +30,7 @@ const (
 type Shorty struct {
 	log    *zap.Logger
 	server *http.Server
+	host   string
 }
 
 // NewShorty creates Shorty instance from config
@@ -59,7 +61,8 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 	router.Get("/{path}", resolverSvc.Resolve)
 
 	return &Shorty{
-		log: cfg.Logger,
+		log:  cfg.Logger,
+		host: cfg.Host,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
@@ -69,14 +72,16 @@ func NewShorty(cfg *config.ShortyConfig) *Shorty {
 			ErrorLog:          zap.NewStdLog(cfg.Logger),
 
 			Handler: requestid.New(&requestid.Config{Generate: cfg.GenerateReqID}).Chain(
-				logging.New(&logging.Config{Logger: cfg.Logger}).Chain(router)),
+				logging.New(&logging.Config{Logger: cfg.Logger}).Chain(
+					compress.New().Chain(router))),
 		},
 	}
 }
 
 func (sh *Shorty) Run() error {
 	sh.log.Info("starting app",
-		zap.String("address", sh.server.Addr))
+		zap.String("address", sh.server.Addr),
+		zap.String("host", sh.host))
 
 	return sh.server.ListenAndServe()
 }

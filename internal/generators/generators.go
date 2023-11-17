@@ -24,8 +24,7 @@ func RandStringFallback(length uint) string {
 func RandString(length uint) string {
 	b := make([]byte, length)
 
-	_, err := crand.Read(b)
-	if err != nil {
+	if _, err := crand.Read(b); err != nil {
 		return RandStringFallback(length)
 	}
 	for i := 0; i < int(length); i++ {

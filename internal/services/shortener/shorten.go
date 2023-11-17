@@ -39,18 +39,12 @@ func (svc *Service) shorten(w http.ResponseWriter, srcURL *url.URL) (shortPath s
 // it returns 400 error. Stored shortened path is sent back to client.
 func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
 	var (
-		bodyLength int
-		shortPath  string
-		srcURL     *url.URL
-		err        error
+		shortPath string
+		srcURL    *url.URL
+		err       error
 	)
-	if bodyLength, err = validate.ShortenRequest(req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("shorten request is not valid", zap.Error(err))
-		return
-	}
 
-	if srcURL, err = getRedirectURLFromBody(req, bodyLength); err != nil {
+	if srcURL, err = getRedirectURLFromBody(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		svc.log.Error("url is not valid", zap.Error(err))
 		return
@@ -70,19 +64,18 @@ func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
 // ShortenJSON does the same as Shorten but operates with json
 func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 	var (
-		bodyLength  int
 		shortPath   string
 		srcURL      *url.URL
 		shortenResp []byte
 		err         error
 	)
-	if bodyLength, err = validate.ShortenRequestJSON(req); err != nil {
+	if err = validate.ShortenRequestJSON(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		svc.log.Error("shorten request is not valid", zap.Error(err))
 		return
 	}
 
-	if srcURL, err = getRedirectURLFromJSONBody(req, bodyLength); err != nil {
+	if srcURL, err = getRedirectURLFromJSONBody(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		svc.log.Error("cannot get url from request body", zap.Error(err))
 		return
@@ -107,8 +100,8 @@ func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func getRedirectURLFromJSONBody(req *http.Request, bodyLength int) (*url.URL, error) {
-	body, err := readBody(req, bodyLength)
+func getRedirectURLFromJSONBody(req *http.Request) (*url.URL, error) {
+	body, err := readBody(req)
 	if err != nil {
 		return nil, err
 	}

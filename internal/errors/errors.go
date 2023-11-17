@@ -3,9 +3,10 @@ package errors
 import "errors"
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrAlreadyExists = errors.New("already exists")
-	ErrGiveUP        = errors.New("given up creating redirect")
+	ErrNotFound        = errors.New("not found")
+	ErrAlreadyExists   = errors.New("already exists")
+	ErrGiveUP          = errors.New("given up creating redirect")
+	ErrUnknownEncoding = errors.New("unknown content encoding")
 )
 
 func Equal(err1, err2 error) bool {
