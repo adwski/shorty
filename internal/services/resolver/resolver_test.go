@@ -1,13 +1,13 @@
 package resolver
 
 import (
+	"github.com/adwski/shorty/internal/storage/simple"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,7 +93,7 @@ func TestService_Redirect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &Service{
-				store: storage.NewStorageSimple(),
+				store: simple.New(),
 				log:   zap.NewExample(),
 			}
 			for k, v := range tt.args.addToStorage {

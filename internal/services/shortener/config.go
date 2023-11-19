@@ -1,12 +1,11 @@
 package shortener
 
 import (
-	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
 type Config struct {
-	Store          storage.Storage
+	Store          Storage
 	ServedScheme   string
 	RedirectScheme string
 	Host           string

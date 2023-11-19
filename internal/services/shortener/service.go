@@ -10,7 +10,6 @@ import (
 
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/generators"
-	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -18,9 +17,14 @@ const (
 	defaultMaxTries = 10
 )
 
+type Storage interface {
+	Get(key string) (url string, err error)
+	Store(key string, url string, overwrite bool) error
+}
+
 // Service is a shortener service
 type Service struct {
-	store          storage.Storage
+	store          Storage
 	servedScheme   string
 	redirectScheme string
 	host           string

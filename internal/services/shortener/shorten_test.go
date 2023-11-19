@@ -3,6 +3,7 @@ package shortener
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/adwski/shorty/internal/storage/simple"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,7 +124,7 @@ func TestService_Shorten(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			// Prepare storage
-			simpleStore := storage.NewStorageSimple()
+			simpleStore := simple.New()
 			for k, v := range tt.args.addToStorage {
 				_ = simpleStore.Store(k, v, true)
 			}

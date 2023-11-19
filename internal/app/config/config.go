@@ -9,23 +9,31 @@ import (
 	"os"
 )
 
+const (
+	StorageKindSimple = iota
+	StorageKindFile
+)
+
 type ShortyConfig struct {
-	ListenAddr     string
-	Host           string
-	RedirectScheme string
-	ServedScheme   string
-	GenerateReqID  bool
-	Logger         *zap.Logger
+	ListenAddr      string
+	Host            string
+	RedirectScheme  string
+	ServedScheme    string
+	FileStoragePath string
+	Storage         int
+	GenerateReqID   bool
+	Logger          *zap.Logger
 }
 
 func New() (*ShortyConfig, error) {
 
 	var (
-		listenAddr     = flag.String("a", ":8080", "listen address")
-		baseURL        = flag.String("b", "http://localhost:8080", "base server URL")
-		redirectScheme = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
-		logLevel       = flag.String("log_level", "debug", "log level")
-		trustRequestID = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
+		listenAddr      = flag.String("a", ":8080", "listen address")
+		baseURL         = flag.String("b", "http://localhost:8080", "base server URL")
+		fileStoragePath = flag.String("f", "/tmp/short-url-db.json", "file storage path")
+		redirectScheme  = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
+		logLevel        = flag.String("log_level", "debug", "log level")
+		trustRequestID  = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
 
@@ -34,6 +42,7 @@ func New() (*ShortyConfig, error) {
 	//--------------------------------------------------
 	envOverride("SERVER_ADDRESS", listenAddr)
 	envOverride("BASE_URL", baseURL)
+	envOverride("FILE_STORAGE_PATH", fileStoragePath)
 
 	//--------------------------------------------------
 	// Configure Logger
@@ -60,16 +69,26 @@ func New() (*ShortyConfig, error) {
 		return nil, errors.Join(errors.New("cannot parse base server URL"), err)
 	}
 
+	var storageKind int
+	if *fileStoragePath == "" {
+		logger.Info("using simple storage")
+	} else {
+		storageKind = StorageKindFile
+		logger.Info("using file storage")
+	}
+
 	//--------------------------------------------------
 	// Create config
 	//--------------------------------------------------
 	return &ShortyConfig{
-		ListenAddr:     *listenAddr,
-		Host:           bURL.Host,
-		RedirectScheme: *redirectScheme,
-		ServedScheme:   bURL.Scheme,
-		GenerateReqID:  !*trustRequestID,
-		Logger:         logger,
+		ListenAddr:      *listenAddr,
+		Host:            bURL.Host,
+		RedirectScheme:  *redirectScheme,
+		ServedScheme:    bURL.Scheme,
+		GenerateReqID:   !*trustRequestID,
+		Logger:          logger,
+		Storage:         storageKind,
+		FileStoragePath: *fileStoragePath,
 	}, nil
 }
 

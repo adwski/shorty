@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -21,7 +22,8 @@ func TestShorty(t *testing.T) {
 		ServedScheme: "http",
 		Logger:       zap.NewExample(),
 	}
-	shorty := NewShorty(cfg)
+	shorty, err := NewShorty(context.Background(), cfg)
+	require.Nil(t, err)
 
 	testURLs := []string{
 		"http://aaa.bbb",

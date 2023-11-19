@@ -39,7 +39,7 @@ func (rw *rwWrapper) close() {
 }
 
 func (rw *rwWrapper) Write(b []byte) (n int, err error) {
-	if rw.cw != nil && rw.needCompression() {
+	if rw.cw != nil {
 		n, err = rw.cw.Write(b)
 	} else {
 		n, err = rw.w.Write(b)

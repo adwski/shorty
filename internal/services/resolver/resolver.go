@@ -5,18 +5,22 @@ import (
 	"net/http"
 
 	"github.com/adwski/shorty/internal/errors"
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
 )
 
+type Storage interface {
+	Get(key string) (url string, err error)
+	Store(key string, url string, overwrite bool) error
+}
+
 // Service is resolver service
 type Service struct {
-	store storage.Storage
+	store Storage
 	log   *zap.Logger
 }
 
 type Config struct {
-	Store  storage.Storage
+	Store  Storage
 	Logger *zap.Logger
 }
 
