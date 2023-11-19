@@ -54,7 +54,7 @@ func New() (*ShortyConfig, error) {
 	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		MessageKey:     "msg",
 		LevelKey:       "level",
-		NameKey:        "logger",
+		TimeKey:        "time",
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
 		EncodeTime:     zapcore.ISO8601TimeEncoder,
 		EncodeDuration: zapcore.StringDurationEncoder,
