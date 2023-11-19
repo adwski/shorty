@@ -24,6 +24,8 @@ const (
 	fileReaderBufferSize = 100000
 
 	flushInterval = 2 * time.Second
+
+	storageFIlePermission = 0600
 )
 
 type db map[string]URLRecord
@@ -121,7 +123,7 @@ func (s *Store) persist() {
 
 func readURLsFromFile(filePath string) (db, error) {
 
-	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, 0666)
+	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFIlePermission)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +179,7 @@ func (s *Store) dumpDB2File() error {
 		buf.Write(data)
 		buf.WriteRune('\n')
 	}
-	return os.WriteFile(s.filePath, buf.Bytes(), 0666)
+	return os.WriteFile(s.filePath, buf.Bytes(), storageFIlePermission)
 }
 
 func (s *Store) dump() db {
