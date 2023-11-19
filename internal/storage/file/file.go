@@ -42,12 +42,14 @@ type Store struct {
 	ctx      context.Context
 	log      *zap.Logger
 	changed  bool
+	done     chan struct{}
 }
 
 type Config struct {
 	FilePath string
 	Ctx      context.Context
 	Logger   *zap.Logger
+	Done     chan struct{}
 }
 
 func New(cfg *Config) (*Store, error) {
@@ -57,6 +59,9 @@ func New(cfg *Config) (*Store, error) {
 	}
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
+	}
+	if cfg.Done == nil {
+		return nil, errors.New("nil done channel")
 	}
 
 	urlDB, err := readURLsFromFile(cfg.FilePath)
@@ -79,6 +84,7 @@ func New(cfg *Config) (*Store, error) {
 		gen:      uuid.NewGen(),
 		ctx:      cfg.Ctx,
 		log:      cfg.Logger,
+		done:     cfg.Done,
 		mux:      &sync.Mutex{},
 	}
 	go s.maintainPersistence()
@@ -91,6 +97,7 @@ Loop:
 		select {
 		case <-s.ctx.Done():
 			s.persist()
+			s.done <- struct{}{}
 			break Loop
 		case <-time.After(flushInterval):
 			s.persist()

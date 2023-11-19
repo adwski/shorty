@@ -14,7 +14,8 @@ shortenertest: build
 	shortenertestbeta -test.v -test.run=^TestIteration$(TESTNUM)$$ \
                   -binary-path=cmd/shortener/shortener \
                   -source-path=. \
-                  -server-port=$$(random unused-port)
+                  -server-port=$$(random unused-port) \
+                  -file-storage-path=/tmp/short-url-db-test.json
 
 .PHONY: statictest
 statictest:

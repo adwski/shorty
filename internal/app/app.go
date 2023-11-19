@@ -45,6 +45,7 @@ type Shorty struct {
 	server *http.Server
 	host   string
 	ctx    context.Context
+	stDone chan struct{}
 }
 
 // NewShorty creates Shorty instance from config
@@ -54,17 +55,20 @@ func NewShorty(ctx context.Context, cfg *config.ShortyConfig) (*Shorty, error) {
 	// Create URL storage
 	//--------------------------------------------------
 	var (
-		storage Storage
-		err     error
+		storage     Storage
+		err         error
+		storageDone chan struct{}
 	)
 	switch cfg.Storage {
 	case config.StorageKindSimple:
 		storage = simple.New()
 	case config.StorageKindFile:
+		storageDone = make(chan struct{})
 		if storage, err = file.New(&file.Config{
 			FilePath: cfg.FileStoragePath,
 			Ctx:      ctx,
 			Logger:   cfg.Logger,
+			Done:     storageDone,
 		}); err != nil {
 			return nil, fmt.Errorf("cannot initialize file storage: %w", err)
 		}
@@ -94,9 +98,10 @@ func NewShorty(ctx context.Context, cfg *config.ShortyConfig) (*Shorty, error) {
 			compress.New().Chain(router)))
 
 	return &Shorty{
-		ctx:  ctx,
-		log:  cfg.Logger,
-		host: cfg.Host,
+		ctx:    ctx,
+		log:    cfg.Logger,
+		host:   cfg.Host,
+		stDone: storageDone,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
@@ -144,6 +149,15 @@ Loop:
 				sh.log.Error("server error", zap.Error(err))
 				errc <- err
 			}
+		}
+	}
+
+	if sh.stDone != nil {
+		select {
+		case <-sh.stDone:
+			sh.log.Debug("storage shutdown complete")
+		case <-time.After(defaultShutdownTimeout):
+			sh.log.Error("storage shutdown timeout")
 		}
 	}
 
