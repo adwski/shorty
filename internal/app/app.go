@@ -116,7 +116,7 @@ func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) 
 	)
 	if runnable, ok := (sh.storage).(Runnable); ok {
 		stDone = make(chan struct{})
-		runnable.Run(ctx, stDone)
+		go runnable.Run(ctx, stDone)
 	}
 
 	sh.log.Info("starting app",
