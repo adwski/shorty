@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"go.uber.org/zap"
 	"io"
@@ -17,6 +18,11 @@ import (
 )
 
 func TestShorty(t *testing.T) {
+	type args struct {
+		url      string
+		compress bool
+	}
+
 	cfg := &config.ShortyConfig{
 		Host:         "xxx.yyy",
 		ServedScheme: "http",
@@ -25,21 +31,59 @@ func TestShorty(t *testing.T) {
 	shorty, err := NewShorty(context.Background(), cfg)
 	require.Nil(t, err)
 
-	testURLs := []string{
-		"http://aaa.bbb",
-		"https://ccc.ddd/123",
-		"https://eee.fff:4567/890",
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "http url",
+			args: args{
+				url: "http://aaa.bbb",
+			},
+		},
+		{
+			name: "https url with path",
+			args: args{
+				url: "https://ccc.ddd/123",
+			},
+		},
+		{
+			name: "https url compressed",
+			args: args{
+				url:      "https://ccc.ddd/123",
+				compress: true,
+			},
+		},
+		{
+			name: "https url with port and path",
+			args: args{
+				url: "https://eee.fff:4567/890",
+			},
+		},
 	}
-	for _, testURL := range testURLs {
-		t.Run("Storing and getting "+testURL, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
 
 			//-----------------------------------------------------
 			// Store URL
 			//-----------------------------------------------------
-			body := []byte(testURL)
-			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+			var (
+				bodyContent = tt.args.url
+				body        = bytes.NewBuffer([]byte{})
+				r           = httptest.NewRequest(http.MethodPost, "/", nil)
+			)
+			if tt.args.compress {
+				gzw := gzip.NewWriter(body)
+				_, err = gzw.Write([]byte(bodyContent))
+				require.NoError(t, err)
+				require.NoError(t, gzw.Close())
+				r.Header.Set("Content-Encoding", "gzip")
+			} else {
+				body.Write([]byte(bodyContent))
+			}
+			r.Body = io.NopCloser(body)
+			r.Header.Set("Content-Length", strconv.Itoa(body.Len()))
 			r.Header.Set("Content-Type", "text/plain")
-			r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 
 			w := httptest.NewRecorder()
 
@@ -81,7 +125,7 @@ func TestShorty(t *testing.T) {
 			assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 
 			// Check headers
-			assert.Equal(t, testURL, res.Header.Get("Location"))
+			assert.Equal(t, tt.args.url, res.Header.Get("Location"))
 		})
 	}
 }

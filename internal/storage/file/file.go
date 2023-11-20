@@ -2,7 +2,6 @@ package file
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,11 +20,11 @@ import (
 )
 
 const (
-	fileReaderBufferSize = 100000
+	fileBufferSize = 100000
 
 	flushInterval = 2 * time.Second
 
-	storageFIlePermission = 0600
+	storageFilePermission = 0600
 )
 
 type db map[string]URLRecord
@@ -48,10 +47,11 @@ type Store struct {
 }
 
 type Config struct {
-	FilePath string
-	Ctx      context.Context
-	Logger   *zap.Logger
-	Done     chan struct{}
+	FilePath               string
+	IgnoreContentOnStartup bool
+	Ctx                    context.Context
+	Logger                 *zap.Logger
+	Done                   chan struct{}
 }
 
 func New(cfg *Config) (*Store, error) {
@@ -66,9 +66,17 @@ func New(cfg *Config) (*Store, error) {
 		return nil, errors.New("nil done channel")
 	}
 
-	urlDB, err := readURLsFromFile(cfg.FilePath)
-	if err != nil {
-		return nil, err
+	var (
+		urlDB db
+		err   error
+	)
+	if !cfg.IgnoreContentOnStartup {
+		urlDB, err = readURLsFromFile(cfg.FilePath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		urlDB = make(db)
 	}
 
 	if ln := len(urlDB); ln > 0 {
@@ -123,12 +131,12 @@ func (s *Store) persist() {
 
 func readURLsFromFile(filePath string) (db, error) {
 
-	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFIlePermission)
+	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFilePermission)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, fileReaderBufferSize)
+	r := bufio.NewReaderSize(f, fileBufferSize)
 
 	var (
 		record *URLRecord
@@ -168,18 +176,25 @@ func readURLFromLine(r *bufio.Reader) (*URLRecord, error) {
 }
 
 func (s *Store) dumpDB2File() error {
-	var (
-		buf bytes.Buffer
-	)
+	f, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, storageFilePermission)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	w := bufio.NewWriterSize(f, fileBufferSize)
+	defer func() { _ = w.Flush() }()
+
 	for _, record := range s.dump() {
-		data, err := json.Marshal(record)
-		if err != nil {
+		var data []byte
+		if data, err = json.Marshal(record); err != nil {
 			return err
 		}
-		buf.Write(data)
-		buf.WriteRune('\n')
+		if _, err = w.Write(append(data, '\n')); err != nil {
+			return fmt.Errorf("cannot write to file: %w", err)
+		}
 	}
-	return os.WriteFile(s.filePath, buf.Bytes(), storageFIlePermission)
+	return nil
 }
 
 func (s *Store) dump() db {

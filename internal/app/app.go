@@ -152,21 +152,21 @@ Loop:
 		}
 	}
 
+	if shutdown {
+		select {
+		case <-done:
+			sh.log.Warn("server shutdown complete")
+		case <-time.After(defaultShutdownTimeout):
+			sh.log.Warn("server shutdown timeout")
+		}
+	}
+
 	if sh.stDone != nil {
 		select {
 		case <-sh.stDone:
 			sh.log.Debug("storage shutdown complete")
 		case <-time.After(defaultShutdownTimeout):
 			sh.log.Error("storage shutdown timeout")
-		}
-	}
-
-	if shutdown {
-		select {
-		case <-done:
-			sh.log.Warn("shutdown complete")
-		case <-time.After(defaultShutdownTimeout):
-			sh.log.Warn("shutdown timeout")
 		}
 	}
 
