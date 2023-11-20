@@ -1,12 +1,13 @@
 package resolver
 
 import (
-	"github.com/adwski/shorty/internal/storage/simple"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/adwski/shorty/internal/storage/simple"
+	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,7 +109,7 @@ func TestService_Redirect(t *testing.T) {
 
 			assert.Equal(t, tt.want.status, res.StatusCode)
 
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
 

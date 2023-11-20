@@ -31,7 +31,6 @@ func TestNewSimple(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			err := tt.si.Store(tt.args.key, tt.args.url, false)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -42,7 +41,6 @@ func TestNewSimple(t *testing.T) {
 			url, err2 := tt.si.Get(tt.args.key)
 			require.NoError(t, err2)
 			assert.Equal(t, tt.args.url, url)
-
 		})
 	}
 }
@@ -78,7 +76,6 @@ func TestNewSimple_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			si := &Store{
 				st:  tt.args.db,
 				mux: &sync.Mutex{},
@@ -91,7 +88,6 @@ func TestNewSimple_Get(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.err, err)
 			}
-
 		})
 	}
 }
@@ -143,7 +139,6 @@ func TestNewSimple_Store(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			si := &Store{
 				st:  tt.args.beforeDB,
 				mux: &sync.Mutex{},

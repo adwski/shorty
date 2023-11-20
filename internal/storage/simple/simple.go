@@ -1,13 +1,14 @@
 package simple
 
 import (
-	"github.com/adwski/shorty/internal/errors"
 	"sync"
+
+	"github.com/adwski/shorty/internal/errors"
 )
 
 // Store is an in-memory URL storage
 // based on map[string]string.
-// All map operations are thread-safe
+// All map operations are thread-safe.
 type Store struct {
 	st  map[string]string
 	mux *sync.Mutex
@@ -20,7 +21,7 @@ func New() *Store {
 	}
 }
 
-// Get returns stored URL by specified key
+// Get returns stored URL by specified key.
 func (s *Store) Get(key string) (url string, err error) {
 	var (
 		ok bool
@@ -34,7 +35,7 @@ func (s *Store) Get(key string) (url string, err error) {
 }
 
 // Store stores url with specified key. If key already exists in storage
-// the value will be overwritten
+// the value will be overwritten.
 func (s *Store) Store(key, url string, overwrite bool) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()

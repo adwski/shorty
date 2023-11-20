@@ -3,12 +3,13 @@ package compress
 import (
 	"compress/gzip"
 	"compress/zlib"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type stub struct {
@@ -95,7 +96,7 @@ func TestMiddleware(t *testing.T) {
 			mw.ServeHTTP(w, r)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			respEnc := resp.Header.Get("Content-Encoding")
 			require.Equal(t, tt.want.contentEncoding, respEnc)
@@ -113,7 +114,7 @@ func TestMiddleware(t *testing.T) {
 				body = resp.Body
 			}
 			require.Nil(t, err)
-			defer body.Close()
+			defer func() { _ = body.Close() }()
 
 			bodyContent, errb := io.ReadAll(body)
 			require.Nil(t, errb)

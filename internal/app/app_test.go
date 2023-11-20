@@ -3,14 +3,14 @@ package app
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
+
+	"go.uber.org/zap"
 
 	"github.com/adwski/shorty/internal/app/config"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func TestShorty(t *testing.T) {
 		ServedScheme: "http",
 		Logger:       zap.NewExample(),
 	}
-	shorty, err := NewShorty(context.Background(), cfg)
+	shorty, err := NewShorty(cfg)
 	require.Nil(t, err)
 
 	tests := []struct {
@@ -63,7 +63,6 @@ func TestShorty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
-
 			//-----------------------------------------------------
 			// Store URL
 			//-----------------------------------------------------

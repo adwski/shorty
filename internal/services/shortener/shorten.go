@@ -3,10 +3,16 @@ package shortener
 import (
 	"encoding/json"
 	"errors"
-	"github.com/adwski/shorty/internal/validate"
-	"go.uber.org/zap"
+	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/adwski/shorty/internal/validate"
+	"go.uber.org/zap"
+)
+
+const (
+	headerContentType = "Content-Type"
 )
 
 type ShortenRequest struct {
@@ -54,14 +60,14 @@ func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set(headerContentType, "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
 		svc.log.Error("error writing body", zap.Error(err))
 	}
 }
 
-// ShortenJSON does the same as Shorten but operates with json
+// ShortenJSON does the same as Shorten but operates with json.
 func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 	var (
 		shortPath   string
@@ -93,21 +99,27 @@ func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write(shortenResp); err != nil {
-		svc.log.Error("error writing body", zap.Error(err))
+		svc.log.Error("error writing json body", zap.Error(err))
 	}
 }
 
-func getRedirectURLFromJSONBody(req *http.Request) (*url.URL, error) {
-	body, err := readBody(req)
-	if err != nil {
-		return nil, err
+func getRedirectURLFromJSONBody(req *http.Request) (u *url.URL, err error) {
+	var body []byte
+	if body, err = readBody(req); err != nil {
+		return
 	}
+
 	var shortenReq ShortenRequest
 	if err = json.Unmarshal(body, &shortenReq); err != nil {
-		return nil, err
+		err = fmt.Errorf("cannot unmarshall json body: %w", err)
+		return
 	}
-	return url.Parse(shortenReq.URL)
+
+	if u, err = url.Parse(shortenReq.URL); err != nil {
+		err = fmt.Errorf("cannot parse url: %w", err)
+	}
+	return
 }

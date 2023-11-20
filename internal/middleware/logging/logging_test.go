@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -67,22 +68,18 @@ func (d *Duration) String() string {
 	return d.Duration.String()
 }
 
-func (d *Duration) UnmarshalJSON(b []byte) error {
+func (d *Duration) UnmarshalJSON(b []byte) (err error) {
 	var v interface{}
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
+	if err = json.Unmarshal(b, &v); err != nil {
+		return
 	}
 	switch value := v.(type) {
 	case string:
-		var err error
 		d.Duration, err = time.ParseDuration(value)
-		if err != nil {
-			return err
-		}
-		return nil
 	default:
-		return errors.New("invalid duration")
+		err = errors.New("invalid duration")
 	}
+	return
 }
 
 func TestMiddleware(t *testing.T) {
@@ -108,7 +105,6 @@ func TestMiddleware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			buf := bytes.NewBuffer(make([]byte, 50))
 			logger := newLogger(buf)
 			buf.WriteRune('\x01')
@@ -125,7 +121,7 @@ func TestMiddleware(t *testing.T) {
 			mw.ServeHTTP(w, r)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			body, err := io.ReadAll(resp.Body)
 			require.Nil(t, err)
@@ -161,7 +157,6 @@ func TestMiddleware(t *testing.T) {
 			assert.True(t, logFields2.Duration.Std() > fakeResponseDuration,
 				fmt.Sprintf("response duration %v should be greater than %v",
 					logFields2.Duration, fakeResponseDuration))
-
 		})
 	}
 }

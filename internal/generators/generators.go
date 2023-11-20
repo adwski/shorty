@@ -10,7 +10,7 @@ var (
 )
 
 // RandStringFallback generates random string with specified length
-// from predefined alphabet. It uses math/rand's weak rng
+// from predefined alphabet. It uses math/rand's weak rng.
 func RandStringFallback(length uint) string {
 	b := make([]byte, length)
 	for i := uint(0); i < length; i++ {
@@ -20,7 +20,7 @@ func RandStringFallback(length uint) string {
 }
 
 // RandString generates random string with specified length
-// from predefined alphabet
+// from predefined alphabet.
 func RandString(length uint) string {
 	b := make([]byte, length)
 

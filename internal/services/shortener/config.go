@@ -6,10 +6,10 @@ import (
 
 type Config struct {
 	Store          Storage
+	Logger         *zap.Logger
 	ServedScheme   string
 	RedirectScheme string
 	Host           string
-	Logger         *zap.Logger
 	PathLength     uint
 }
 

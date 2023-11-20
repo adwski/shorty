@@ -1,8 +1,9 @@
 package resolver
 
 import (
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/validate"
@@ -13,7 +14,8 @@ type Storage interface {
 	Store(key string, url string, overwrite bool) error
 }
 
-// Service is resolver service
+// Service implements http handler for url redirects.
+// It uses url storage as source for short urls mappings.
 type Service struct {
 	store Storage
 	log   *zap.Logger
@@ -32,7 +34,7 @@ func New(cfg *Config) *Service {
 }
 
 // Resolve reads URL path, retrieves corresponding URL from storage
-// and returns 307 response. It performs path validation before calling storage
+// and returns 307 response. It performs path validation before calling storage.
 func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 	var (
 		redirect string

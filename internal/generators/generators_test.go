@@ -1,9 +1,10 @@
 package generators
 
 import (
-	"github.com/stretchr/testify/assert"
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRandString(t *testing.T) {
@@ -30,7 +31,6 @@ func TestRandString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			gen := RandString(tt.length)
 			assert.Equal(t, tt.want, len(gen))
 

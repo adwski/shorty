@@ -3,14 +3,16 @@ package file
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"os"
-	"sync"
-	"testing"
 )
 
 func TestFileStore(t *testing.T) {
@@ -40,11 +42,11 @@ func TestFileStore(t *testing.T) {
 			fs, err := New(&Config{
 				FilePath:               storeFile,
 				IgnoreContentOnStartup: true, // with mock we don't have to do this :(
-				Ctx:                    ctx,
 				Logger:                 zap.NewExample(),
-				Done:                   done,
 			})
 			require.NoError(t, err)
+
+			go fs.Run(ctx, done)
 
 			// store
 			err = fs.Store(tt.args.key, tt.args.url, false)
@@ -56,9 +58,13 @@ func TestFileStore(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.args.url, url)
 
-			// close storage
+			// stop persistence
 			cancel()
-			<-done
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("file storage did not shutdown in time")
+			}
 
 			// check persistence
 			var (
@@ -108,7 +114,6 @@ func TestStore_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			fs := Store{
 				mux: &sync.Mutex{},
 				gen: uuid.NewGen(),
@@ -129,7 +134,6 @@ func TestStore_Get(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.err, err)
 			}
-
 		})
 	}
 }
@@ -181,7 +185,6 @@ func TestStore_Store(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			fs := Store{
 				mux: &sync.Mutex{},
 				gen: uuid.NewGen(),

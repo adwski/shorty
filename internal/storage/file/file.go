@@ -35,35 +35,28 @@ type URLRecord struct {
 	OriginalURL string `json:"original_url"`
 }
 
+// Store is a simple in-memory store with file persistence.
+// Saving into file is done in background without affecting
+// Get/Set operations. Since file is completely rewritten on each
+// interval, this store is not suited for large quantities of records.
 type Store struct {
-	filePath string
-	mux      *sync.Mutex
-	db       db
 	gen      uuid.Generator
-	ctx      context.Context
+	mux      *sync.Mutex
 	log      *zap.Logger
+	db       db
+	filePath string
 	changed  bool
-	done     chan struct{}
 }
 
 type Config struct {
+	Logger                 *zap.Logger
 	FilePath               string
 	IgnoreContentOnStartup bool
-	Ctx                    context.Context
-	Logger                 *zap.Logger
-	Done                   chan struct{}
 }
 
 func New(cfg *Config) (*Store, error) {
-
-	if cfg.Ctx == nil {
-		return nil, errors.New("nil context")
-	}
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
-	}
-	if cfg.Done == nil {
-		return nil, errors.New("nil done channel")
 	}
 
 	var (
@@ -71,8 +64,7 @@ func New(cfg *Config) (*Store, error) {
 		err   error
 	)
 	if !cfg.IgnoreContentOnStartup {
-		urlDB, err = readURLsFromFile(cfg.FilePath)
-		if err != nil {
+		if urlDB, err = readURLsFromFile(cfg.FilePath); err != nil {
 			return nil, err
 		}
 	} else {
@@ -88,26 +80,26 @@ func New(cfg *Config) (*Store, error) {
 			zap.String("path", cfg.FilePath))
 	}
 
-	s := &Store{
+	return &Store{
 		filePath: cfg.FilePath,
 		db:       urlDB,
 		gen:      uuid.NewGen(),
-		ctx:      cfg.Ctx,
 		log:      cfg.Logger,
-		done:     cfg.Done,
 		mux:      &sync.Mutex{},
-	}
-	go s.maintainPersistence()
-	return s, nil
+	}, nil
 }
 
-func (s *Store) maintainPersistence() {
+func (s *Store) Run(ctx context.Context, done chan<- struct{}) {
+	s.maintainPersistence(ctx, done)
+}
+
+func (s *Store) maintainPersistence(ctx context.Context, done chan<- struct{}) {
 Loop:
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			s.persist()
-			s.done <- struct{}{}
+			done <- struct{}{}
 			break Loop
 		case <-time.After(flushInterval):
 			s.persist()
@@ -130,10 +122,9 @@ func (s *Store) persist() {
 }
 
 func readURLsFromFile(filePath string) (db, error) {
-
 	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFilePermission)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot open file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 	r := bufio.NewReaderSize(f, fileBufferSize)
@@ -163,22 +154,21 @@ func readURLFromLine(r *bufio.Reader) (*URLRecord, error) {
 	data, err := r.ReadBytes('\n')
 	if err != nil {
 		if !errors.Is(err, io.EOF) || len(data) == 0 {
-			return nil, err
+			return nil, fmt.Errorf("error while reading url from filestore: %w", err)
 		}
 	}
 
 	var rec URLRecord
 	if err = json.Unmarshal(data[:len(data)-1], &rec); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("malformed json data: %w", err)
 	}
-
 	return &rec, nil
 }
 
 func (s *Store) dumpDB2File() error {
 	f, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, storageFilePermission)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot open file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -188,7 +178,7 @@ func (s *Store) dumpDB2File() error {
 	for _, record := range s.dump() {
 		var data []byte
 		if data, err = json.Marshal(record); err != nil {
-			return err
+			return fmt.Errorf("cannot marshal to json: %w", err)
 		}
 		if _, err = w.Write(append(data, '\n')); err != nil {
 			return fmt.Errorf("cannot write to file: %w", err)
@@ -223,7 +213,7 @@ func (s *Store) Store(key string, url string, overwrite bool) error {
 	}
 	u, err := s.gen.NewV4()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot generate key uuid: %w", err)
 	}
 	s.db[key] = URLRecord{
 		UUID:        u.String(),

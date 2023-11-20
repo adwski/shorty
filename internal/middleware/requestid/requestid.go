@@ -29,11 +29,9 @@ func (mw *Middleware) Chain(h http.Handler) *Middleware {
 }
 
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	if mw.gen != nil {
 		mw.setRequestID(r)
 	}
-
 	mw.handler.ServeHTTP(w, r)
 }
 

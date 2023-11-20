@@ -23,7 +23,10 @@ statictest:
 
 .PHONY: lint
 lint:
-	golangci-lint run ./... -p bugs -e G404
+	golangci-lint run ./... -c .golangci.yml
+
+goimports:
+	goimports -v -w  .
 
 .PHONY: docker
 docker:

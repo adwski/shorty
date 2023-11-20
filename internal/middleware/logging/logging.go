@@ -23,9 +23,9 @@ func New(cfg *Config) *Middleware {
 }
 
 type rwWrapper struct {
+	http.ResponseWriter
 	status int
 	size   int
-	http.ResponseWriter
 }
 
 func newResponseWrapper(w http.ResponseWriter) *rwWrapper {
@@ -34,10 +34,10 @@ func newResponseWrapper(w http.ResponseWriter) *rwWrapper {
 	}
 }
 
-func (rw *rwWrapper) Write(b []byte) (int, error) {
-	n, err := rw.ResponseWriter.Write(b)
+func (rw *rwWrapper) Write(b []byte) (n int, err error) {
+	n, err = rw.ResponseWriter.Write(b)
 	rw.size += n
-	return n, err
+	return
 }
 
 func (rw *rwWrapper) WriteHeader(statusCode int) {
@@ -55,7 +55,6 @@ func (mw *Middleware) Chain(h http.Handler) *Middleware {
 }
 
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	var (
 		start = time.Now()
 		reqID = r.Header.Get("X-Request-ID")

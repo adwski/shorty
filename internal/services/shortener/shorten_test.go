@@ -3,14 +3,15 @@ package shortener
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/adwski/shorty/internal/storage/simple"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
+
+	"github.com/adwski/shorty/internal/storage/simple"
+	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,7 +123,6 @@ func TestService_Shorten(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Prepare storage
 			simpleStore := simple.New()
 			for k, v := range tt.args.addToStorage {
@@ -170,7 +170,7 @@ func TestService_Shorten(t *testing.T) {
 			}
 
 			// Check body
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
 			require.NotEqual(t, []byte{}, resBody)

@@ -3,10 +3,11 @@ package config
 import (
 	"errors"
 	"flag"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"net/url"
 	"os"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 )
 
 type ShortyConfig struct {
+	Logger          *zap.Logger
 	ListenAddr      string
 	Host            string
 	RedirectScheme  string
@@ -22,11 +24,9 @@ type ShortyConfig struct {
 	FileStoragePath string
 	Storage         int
 	GenerateReqID   bool
-	Logger          *zap.Logger
 }
 
 func New() (*ShortyConfig, error) {
-
 	var (
 		listenAddr      = flag.String("a", ":8080", "listen address")
 		baseURL         = flag.String("b", "http://localhost:8080", "base server URL")

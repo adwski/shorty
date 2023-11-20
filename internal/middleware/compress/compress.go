@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+const (
+	typeGZIP    = "gzip"
+	typeDeflate = "deflate"
+)
+
 type Middleware struct {
 	handler http.Handler
 }
@@ -24,10 +29,10 @@ type rwWrapper struct {
 
 func newResponseWrapper(w http.ResponseWriter, enc string) *rwWrapper {
 	rw := &rwWrapper{w: w}
-	if strings.Contains(enc, "gzip") {
-		rw.ct = "gzip"
-	} else if strings.Contains(enc, "deflate") {
-		rw.ct = "deflate"
+	if strings.Contains(enc, typeGZIP) {
+		rw.ct = typeGZIP
+	} else if strings.Contains(enc, typeDeflate) {
+		rw.ct = typeDeflate
 	}
 	return rw
 }
@@ -60,9 +65,9 @@ func (rw *rwWrapper) WriteHeader(statusCode int) {
 	if rw.ct != "" && rw.needCompression() {
 		rw.w.Header().Set("Content-Encoding", rw.ct)
 		switch rw.ct {
-		case "gzip":
+		case typeGZIP:
 			rw.cw = gzip.NewWriter(rw.w)
-		case "deflate":
+		case typeDeflate:
 			rw.cw = zlib.NewWriter(rw.w)
 		}
 	}

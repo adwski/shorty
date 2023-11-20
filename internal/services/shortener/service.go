@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"net/url"
 
+	"go.uber.org/zap"
+
 	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/generators"
-	"go.uber.org/zap"
 )
 
 const (
@@ -22,13 +23,13 @@ type Storage interface {
 	Store(key string, url string, overwrite bool) error
 }
 
-// Service is a shortener service
+// Service implements http handler for shortened urls management.
 type Service struct {
 	store          Storage
+	log            *zap.Logger
 	servedScheme   string
 	redirectScheme string
 	host           string
-	log            *zap.Logger
 	pathLength     uint
 }
 
@@ -54,12 +55,16 @@ func (svc *Service) storeURL(u string) (path string, err error) {
 	return
 }
 
-func getRedirectURLFromBody(req *http.Request) (*url.URL, error) {
-	body, err := readBody(req)
-	if err != nil {
-		return nil, err
+func getRedirectURLFromBody(req *http.Request) (u *url.URL, err error) {
+	var body []byte
+	if body, err = readBody(req); err != nil {
+		err = fmt.Errorf("cannot get url from request body: %w", err)
+		return
 	}
-	return url.Parse(string(body))
+	if u, err = url.Parse(string(body)); err != nil {
+		err = fmt.Errorf("cannot parse url from request body: %w", err)
+	}
+	return
 }
 
 func readBody(req *http.Request) (body []byte, err error) {

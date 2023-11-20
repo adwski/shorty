@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
 	"github.com/adwski/shorty/internal/storage/file"
 	"github.com/adwski/shorty/internal/storage/simple"
-	"log"
-	"net/http"
-	"sync"
-	"time"
 
 	"github.com/adwski/shorty/internal/app/config"
 	"github.com/adwski/shorty/internal/services/resolver"
@@ -37,41 +38,37 @@ type Storage interface {
 	Store(key string, url string, overwrite bool) error
 }
 
-// Shorty is URL shortener app
-// It consists of shortener and redirector services
-// Also it uses key-value storage to store URLs and shortened paths
-type Shorty struct {
-	log    *zap.Logger
-	server *http.Server
-	host   string
-	ctx    context.Context
-	stDone chan struct{}
+type Runnable interface {
+	Run(ctx context.Context, done chan<- struct{})
 }
 
-// NewShorty creates Shorty instance from config
-func NewShorty(ctx context.Context, cfg *config.ShortyConfig) (*Shorty, error) {
+// Shorty is URL shortener app
+// It consists of shortener and redirector services
+// Also it uses key-value storage to store URLs and shortened paths.
+type Shorty struct {
+	storage Storage
+	log     *zap.Logger
+	server  *http.Server
+	host    string
+}
 
-	//--------------------------------------------------
-	// Create URL storage
-	//--------------------------------------------------
+// NewShorty creates Shorty instance from config.
+func NewShorty(cfg *config.ShortyConfig) (*Shorty, error) {
 	var (
-		storage     Storage
-		err         error
-		storageDone chan struct{}
+		storage Storage
+		err     error
 	)
 	switch cfg.Storage {
-	case config.StorageKindSimple:
-		storage = simple.New()
 	case config.StorageKindFile:
-		storageDone = make(chan struct{})
 		if storage, err = file.New(&file.Config{
 			FilePath: cfg.FileStoragePath,
-			Ctx:      ctx,
 			Logger:   cfg.Logger,
-			Done:     storageDone,
 		}); err != nil {
 			return nil, fmt.Errorf("cannot initialize file storage: %w", err)
 		}
+
+	default: // config.StorageKindSimple
+		storage = simple.New()
 	}
 
 	shortenerSvc := shortener.New(&shortener.Config{
@@ -98,10 +95,9 @@ func NewShorty(ctx context.Context, cfg *config.ShortyConfig) (*Shorty, error) {
 			compress.New().Chain(router)))
 
 	return &Shorty{
-		ctx:    ctx,
-		log:    cfg.Logger,
-		host:   cfg.Host,
-		stDone: storageDone,
+		log:     cfg.Logger,
+		host:    cfg.Host,
+		storage: storage,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
@@ -114,7 +110,15 @@ func NewShorty(ctx context.Context, cfg *config.ShortyConfig) (*Shorty, error) {
 	}, nil
 }
 
-func (sh *Shorty) Run(wg *sync.WaitGroup, errc chan error) {
+func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
+	var (
+		stDone chan struct{}
+	)
+	if runnable, ok := (sh.storage).(Runnable); ok {
+		stDone = make(chan struct{})
+		runnable.Run(ctx, stDone)
+	}
+
 	sh.log.Info("starting app",
 		zap.String("address", sh.server.Addr),
 		zap.String("host", sh.host))
@@ -132,7 +136,7 @@ func (sh *Shorty) Run(wg *sync.WaitGroup, errc chan error) {
 Loop:
 	for {
 		select {
-		case <-sh.ctx.Done():
+		case <-ctx.Done():
 			shutdown = true
 			sh.log.Warn("got canceled, shutting down")
 			go func() {
@@ -161,9 +165,9 @@ Loop:
 		}
 	}
 
-	if sh.stDone != nil {
+	if stDone != nil {
 		select {
-		case <-sh.stDone:
+		case <-stDone:
 			sh.log.Debug("storage shutdown complete")
 		case <-time.After(defaultShutdownTimeout):
 			sh.log.Error("storage shutdown timeout")
