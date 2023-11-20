@@ -14,7 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	e "github.com/adwski/shorty/internal/errors"
+	"github.com/adwski/shorty/internal/storage"
+
 	"github.com/gofrs/uuid/v5"
 	"go.uber.org/zap"
 )
@@ -200,7 +201,7 @@ func (s *Store) Get(key string) (string, error) {
 	defer s.mux.Unlock()
 	record, ok := s.db[key]
 	if !ok {
-		return "", e.ErrNotFound
+		return "", storage.ErrNotFound
 	}
 	return record.OriginalURL, nil
 }
@@ -209,7 +210,7 @@ func (s *Store) Store(key string, url string, overwrite bool) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if _, ok := s.db[key]; ok && !overwrite {
-		return e.ErrAlreadyExists
+		return storage.ErrAlreadyExists
 	}
 	u, err := s.gen.NewV4()
 	if err != nil {

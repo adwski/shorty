@@ -1,12 +1,12 @@
 package resolver
 
 import (
+	"errors"
 	"net/http"
 
-	"go.uber.org/zap"
-
-	"github.com/adwski/shorty/internal/errors"
+	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
+	"go.uber.org/zap"
 )
 
 type Storage interface {
@@ -47,7 +47,7 @@ func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if redirect, err = svc.store.Get(req.URL.Path[1:]); err != nil {
-		if errors.Equal(err, errors.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			svc.log.Error("cannot get redirect", zap.Error(err))

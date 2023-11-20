@@ -3,7 +3,7 @@ package simple
 import (
 	"sync"
 
-	"github.com/adwski/shorty/internal/errors"
+	"github.com/adwski/shorty/internal/storage"
 )
 
 // Store is an in-memory URL storage
@@ -29,7 +29,7 @@ func (s *Store) Get(key string) (url string, err error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if url, ok = s.st[key]; !ok {
-		err = errors.ErrNotFound
+		err = storage.ErrNotFound
 	}
 	return
 }
@@ -40,7 +40,7 @@ func (s *Store) Store(key, url string, overwrite bool) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if _, ok := s.st[key]; ok && !overwrite {
-		return errors.ErrAlreadyExists
+		return storage.ErrAlreadyExists
 	}
 	s.st[key] = url
 	return nil

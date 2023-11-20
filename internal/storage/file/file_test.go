@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adwski/shorty/internal/errors"
+	"github.com/adwski/shorty/internal/storage"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,7 +110,7 @@ func TestStore_Get(t *testing.T) {
 				key: "aaa",
 				url: "https://bbb.ccc",
 			},
-			err: errors.ErrNotFound,
+			err: storage.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
@@ -168,7 +169,7 @@ func TestStore_Store(t *testing.T) {
 				url:       "https://ddd.eee",
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
-				wantErr:   errors.ErrAlreadyExists,
+				wantErr:   storage.ErrAlreadyExists,
 				overwrite: false,
 			},
 		},

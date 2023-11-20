@@ -3,15 +3,15 @@ package shortener
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 
-	"go.uber.org/zap"
-
-	"github.com/adwski/shorty/internal/errors"
 	"github.com/adwski/shorty/internal/generators"
+	"github.com/adwski/shorty/internal/storage"
+	"go.uber.org/zap"
 )
 
 const (
@@ -40,12 +40,12 @@ func (svc *Service) getServedURL(shortPath string) string {
 func (svc *Service) storeURL(u string) (path string, err error) {
 	for try := 0; try <= defaultMaxTries; try++ {
 		if try == defaultMaxTries {
-			err = errors.ErrGiveUP
+			err = errors.New("given up creating redirect")
 			return
 		}
 		path = generators.RandString(svc.pathLength)
 		if err = svc.store.Store(path, u, false); err != nil {
-			if errors.Equal(err, errors.ErrAlreadyExists) {
+			if errors.Is(err, storage.ErrAlreadyExists) {
 				continue
 			}
 			return
@@ -91,7 +91,7 @@ func getContentReader(req *http.Request) (r io.ReadCloser, err error) {
 	case "":
 		r = req.Body
 	default:
-		err = errors.ErrUnknownEncoding
+		err = errors.New("unknown content encoding")
 	}
 	return
 }

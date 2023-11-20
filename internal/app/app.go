@@ -161,7 +161,7 @@ Loop:
 		case <-done:
 			sh.log.Warn("server shutdown complete")
 		case <-time.After(defaultShutdownTimeout):
-			sh.log.Warn("server shutdown timeout")
+			sh.log.Error("server shutdown timeout")
 		}
 	}
 
