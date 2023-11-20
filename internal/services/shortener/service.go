@@ -73,7 +73,7 @@ func readBody(req *http.Request) (body []byte, err error) {
 	)
 	defer func() { _ = req.Body.Close() }()
 
-	if r, err = readBodyContent(req); err != nil {
+	if r, err = getContentReader(req); err != nil {
 		return
 	}
 	defer func() { _ = r.Close() }()
@@ -82,7 +82,7 @@ func readBody(req *http.Request) (body []byte, err error) {
 	return
 }
 
-func readBodyContent(req *http.Request) (r io.ReadCloser, err error) {
+func getContentReader(req *http.Request) (r io.ReadCloser, err error) {
 	switch req.Header.Get("Content-Encoding") {
 	case "gzip":
 		r, err = gzip.NewReader(req.Body)
