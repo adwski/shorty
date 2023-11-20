@@ -109,9 +109,9 @@ func TestService_Redirect(t *testing.T) {
 
 			assert.Equal(t, tt.want.status, res.StatusCode)
 
-			defer func() { _ = res.Body.Close() }()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
+			require.NoError(t, res.Body.Close())
 
 			if tt.want.headers != nil {
 				for k, v := range tt.want.headers {

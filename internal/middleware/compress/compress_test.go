@@ -96,7 +96,6 @@ func TestMiddleware(t *testing.T) {
 			mw.ServeHTTP(w, r)
 
 			resp := w.Result()
-			defer func() { _ = resp.Body.Close() }()
 
 			respEnc := resp.Header.Get("Content-Encoding")
 			require.Equal(t, tt.want.contentEncoding, respEnc)
@@ -118,6 +117,7 @@ func TestMiddleware(t *testing.T) {
 
 			bodyContent, errb := io.ReadAll(body)
 			require.Nil(t, errb)
+			require.Nil(t, resp.Body.Close())
 
 			assert.Equal(t, s.body, bodyContent)
 		})

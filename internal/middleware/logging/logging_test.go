@@ -121,10 +121,10 @@ func TestMiddleware(t *testing.T) {
 			mw.ServeHTTP(w, r)
 
 			resp := w.Result()
-			defer func() { _ = resp.Body.Close() }()
 
 			body, err := io.ReadAll(resp.Body)
 			require.Nil(t, err)
+			require.Nil(t, resp.Body.Close())
 
 			assert.Equal(t, tt.args.status, resp.StatusCode)
 			assert.Equal(t, tt.args.body, string(body))

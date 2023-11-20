@@ -170,9 +170,9 @@ func TestService_Shorten(t *testing.T) {
 			}
 
 			// Check body
-			defer func() { _ = res.Body.Close() }()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
+			require.NoError(t, res.Body.Close())
 			require.NotEqual(t, []byte{}, resBody)
 
 			// Check return URL

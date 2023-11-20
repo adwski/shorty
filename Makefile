@@ -19,7 +19,7 @@ shortenertest: build
 
 .PHONY: statictest
 statictest:
-	go vet -vettool=$(which statictest) ./...
+	go vet -vettool=$$(which statictest) ./...
 
 .PHONY: lint
 lint:
