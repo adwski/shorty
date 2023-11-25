@@ -1,6 +1,6 @@
 .PHONY: mock
 mock:
-	rm -rf ./internal/mocks
+	find . -type d -name "mock*" -exec rm -rf {} +
 	mockery
 
 .PHONY: unittests
@@ -34,7 +34,7 @@ goimports:
 	goimports -w  .
 
 .PHONY: test
-test: goimports lint unittests statictest
+test: mock goimports lint unittests statictest
 	for num in 1 2 3 4 5 6 7 8 9; do \
 		$(MAKE) shortenertest TESTNUM=$$num ; \
 	done
