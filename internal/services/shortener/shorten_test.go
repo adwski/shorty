@@ -149,6 +149,7 @@ func TestService_Shorten(t *testing.T) {
 				log:            zap.NewExample(),
 			}
 
+			// Prepare request
 			var body []byte
 			if tt.args.json {
 				var jErr error
@@ -158,7 +159,6 @@ func TestService_Shorten(t *testing.T) {
 				body = []byte(tt.args.url)
 			}
 
-			// Prepare request
 			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(body))
 			for k, v := range tt.args.headers {
 				r.Header.Set(k, v)

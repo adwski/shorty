@@ -9,8 +9,7 @@ import (
 	"os"
 
 	"github.com/adwski/shorty/internal/storage/file"
-	"github.com/adwski/shorty/internal/storage/simple"
-
+	"github.com/adwski/shorty/internal/storage/memory"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -76,7 +75,7 @@ func New() (*Shorty, error) {
 	var storage Storage
 	if *fileStoragePath == "" {
 		logger.Info("using simple storage")
-		storage = simple.New()
+		storage = memory.New()
 	} else {
 		if storage, err = file.New(&file.Config{
 			FilePath: *fileStoragePath,

@@ -7,16 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
-	"net/url"
 	"os"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
+	"github.com/adwski/shorty/internal/storage/memory"
+	"github.com/adwski/shorty/internal/storage/memory/db"
 
-	"github.com/gofrs/uuid/v5"
 	"go.uber.org/zap"
 )
 
@@ -28,23 +26,13 @@ const (
 	storageFilePermission = 0600
 )
 
-type db map[string]URLRecord
-
-type URLRecord struct {
-	UUID        string `json:"uuid"`
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
-
-// Store is a simple in-memory store with file persistence.
+// File is a simple in-memory store with file persistence.
 // Saving into file is done in background without affecting
 // Get/Set operations. Since file is completely rewritten on each
 // interval, this store is not suited for large quantities of records.
-type Store struct {
-	gen      uuid.Generator
-	mux      *sync.Mutex
+type File struct {
+	*memory.Memory
 	log      *zap.Logger
-	db       db
 	filePath string
 	changed  bool
 	shutdown bool
@@ -56,24 +44,22 @@ type Config struct {
 	IgnoreContentOnStartup bool
 }
 
-func New(cfg *Config) (*Store, error) {
+func New(cfg *Config) (*File, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
 	}
 
 	var (
-		urlDB db
-		err   error
+		st  = memory.New()
+		err error
 	)
 	if !cfg.IgnoreContentOnStartup {
-		if urlDB, err = readURLsFromFile(cfg.FilePath); err != nil {
+		if st.DB, err = readURLsFromFile(cfg.FilePath); err != nil {
 			return nil, err
 		}
-	} else {
-		urlDB = make(db)
 	}
 
-	if ln := len(urlDB); ln > 0 {
+	if ln := len(st.DB); ln > 0 {
 		cfg.Logger.Info("loaded db from file",
 			zap.Int("records", ln),
 			zap.String("path", cfg.FilePath))
@@ -82,21 +68,29 @@ func New(cfg *Config) (*Store, error) {
 			zap.String("path", cfg.FilePath))
 	}
 
-	return &Store{
-		filePath: cfg.FilePath,
-		db:       urlDB,
-		gen:      uuid.NewGen(),
+	return &File{
+		Memory:   st,
 		log:      cfg.Logger,
-		mux:      &sync.Mutex{},
+		filePath: cfg.FilePath,
 	}, nil
 }
 
-func (s *Store) Run(ctx context.Context, wg *sync.WaitGroup) {
+func (s *File) Store(key string, url string, overwrite bool) error {
+	if s.shutdown {
+		return errors.New("storage is shutting down")
+	}
+	if err := s.Memory.Store(key, url, overwrite); err != nil {
+		return fmt.Errorf("cannot store url: %w", err)
+	}
+	return nil
+}
+
+func (s *File) Run(ctx context.Context, wg *sync.WaitGroup) {
 	s.maintainPersistence(ctx)
 	wg.Done()
 }
 
-func (s *Store) maintainPersistence(ctx context.Context) {
+func (s *File) maintainPersistence(ctx context.Context) {
 Loop:
 	for {
 		select {
@@ -110,7 +104,7 @@ Loop:
 	}
 }
 
-func (s *Store) persist() {
+func (s *File) persist() {
 	if !s.changed {
 		return
 	}
@@ -124,51 +118,7 @@ func (s *Store) persist() {
 	}
 }
 
-func readURLsFromFile(filePath string) (db, error) {
-	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFilePermission)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	r := bufio.NewReaderSize(f, fileBufferSize)
-
-	var (
-		record *URLRecord
-		urlDB  = make(db)
-	)
-
-	for {
-		record, err = readURLFromLine(r)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if _, err = uuid.FromString(record.UUID); err != nil {
-			return nil, fmt.Errorf("malformed uuid: %w", err)
-		}
-		if _, err = url.Parse(record.OriginalURL); err != nil {
-			return nil, fmt.Errorf("malformed url for %s: %w", record.UUID, err)
-		}
-		urlDB[record.ShortURL] = *record
-	}
-	return urlDB, nil
-}
-
-func readURLFromLine(r *bufio.Reader) (*URLRecord, error) {
-	data, err := r.ReadBytes('\n')
-	if err != nil {
-		if !errors.Is(err, io.EOF) || len(data) == 0 {
-			return nil, fmt.Errorf("error while reading url from filestore: %w", err)
-		}
-	}
-
-	var rec URLRecord
-	if err = json.Unmarshal(data[:len(data)-1], &rec); err != nil {
-		return nil, fmt.Errorf("malformed json data: %w", err)
-	}
-	return &rec, nil
-}
-
-func (s *Store) dumpDB2File() error {
+func (s *File) dumpDB2File() error {
 	f, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, storageFilePermission)
 	if err != nil {
 		return fmt.Errorf("cannot open file: %w", err)
@@ -178,7 +128,7 @@ func (s *Store) dumpDB2File() error {
 	w := bufio.NewWriterSize(f, fileBufferSize)
 	defer func() { _ = w.Flush() }()
 
-	for _, record := range s.dump() {
+	for _, record := range s.Dump() {
 		var data []byte
 		if data, err = json.Marshal(record); err != nil {
 			return fmt.Errorf("cannot marshal to json: %w", err)
@@ -190,42 +140,41 @@ func (s *Store) dumpDB2File() error {
 	return nil
 }
 
-func (s *Store) dump() db {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	dump := make(db, len(s.db))
-	maps.Copy(dump, s.db)
-	return dump
-}
-
-func (s *Store) Get(key string) (string, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	record, ok := s.db[key]
-	if !ok {
-		return "", storage.ErrNotFound
-	}
-	return record.OriginalURL, nil
-}
-
-func (s *Store) Store(key string, url string, overwrite bool) error {
-	if s.shutdown {
-		return errors.New("storage is shutting down")
-	}
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	if _, ok := s.db[key]; ok && !overwrite {
-		return storage.ErrAlreadyExists
-	}
-	u, err := s.gen.NewV4()
+func readURLsFromFile(filePath string) (db.DB, error) {
+	f, err := os.OpenFile(filePath, syscall.O_RDONLY|syscall.O_CREAT, storageFilePermission)
 	if err != nil {
-		return fmt.Errorf("cannot generate key uuid: %w", err)
+		return nil, fmt.Errorf("cannot open file: %w", err)
 	}
-	s.db[key] = URLRecord{
-		UUID:        u.String(),
-		ShortURL:    key,
-		OriginalURL: url,
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, fileBufferSize)
+
+	var (
+		record *db.URLRecord
+		urlDB  = db.NewDB()
+	)
+
+	for {
+		if record, err = readURLFromLine(r); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+		urlDB[record.ShortURL] = *record
 	}
-	s.changed = true
-	return nil
+	return urlDB, nil
+}
+
+func readURLFromLine(r *bufio.Reader) (*db.URLRecord, error) {
+	data, err := r.ReadBytes('\n')
+	if err != nil {
+		if !errors.Is(err, io.EOF) || len(data) == 0 {
+			return nil, fmt.Errorf("error while reading url from filestore: %w", err)
+		}
+	}
+	var record *db.URLRecord
+	if record, err = db.NewURLRecordFromBytes(data[:len(data)-1]); err != nil {
+		return nil, fmt.Errorf("cannot parse url record: %w", err)
+	}
+	return record, nil
 }

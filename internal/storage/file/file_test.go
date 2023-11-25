@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/adwski/shorty/internal/storage/memory"
+	"github.com/adwski/shorty/internal/storage/memory/db"
+
 	"github.com/adwski/shorty/internal/storage"
 
 	"github.com/gofrs/uuid/v5"
@@ -76,7 +79,7 @@ func TestFileStore(t *testing.T) {
 			// check persistence
 			var (
 				content []byte
-				urlRec  URLRecord
+				urlRec  db.URLRecord
 			)
 			content, err = os.ReadFile(storeFile)
 			require.NoError(t, err)
@@ -121,14 +124,12 @@ func TestStore_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fs := Store{
-				mux: &sync.Mutex{},
-				gen: uuid.NewGen(),
-				db:  make(db),
+			fs := &File{
+				Memory: memory.New(),
 			}
 			for k, v := range tt.args.db {
-				fs.db[k] = URLRecord{
-					UUID:        uuid.Must(fs.gen.NewV4()).String(),
+				fs.Memory.DB[k] = db.URLRecord{
+					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,
 				}
@@ -192,14 +193,12 @@ func TestStore_Store(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fs := Store{
-				mux: &sync.Mutex{},
-				gen: uuid.NewGen(),
-				db:  make(db),
+			fs := File{
+				Memory: memory.New(),
 			}
 			for k, v := range tt.args.beforeDB {
-				fs.db[k] = URLRecord{
-					UUID:        uuid.Must(fs.gen.NewV4()).String(),
+				fs.Memory.DB[k] = db.URLRecord{
+					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,
 				}
@@ -209,13 +208,13 @@ func TestStore_Store(t *testing.T) {
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)
-				assert.Equal(t, tt.args.wantErr.Error(), err.Error())
+				assert.ErrorIs(t, err, tt.args.wantErr)
 			} else {
 				require.Nil(t, err)
 			}
 
 			for k, v := range tt.args.wantDB {
-				assert.Equal(t, v, fs.db[k].OriginalURL)
+				assert.Equal(t, v, fs.Memory.DB[k].OriginalURL)
 			}
 		})
 	}
