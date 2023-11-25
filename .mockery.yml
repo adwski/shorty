@@ -4,7 +4,7 @@ with-expecter: True
 mockname: "{{.InterfaceName}}"
 filename: "mock_{{.MockName}}.go"
 outpkg: "mock{{.PackageName}}"
-dir: "internal/mocks/mock{{.PackageName}}"
+dir: "{{.InterfaceDir}}/mock{{.PackageName}}"
 packages:
   github.com/adwski/shorty/internal/app/config:
     interfaces:

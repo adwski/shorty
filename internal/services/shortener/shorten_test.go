@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/mocks/mockconfig"
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
+
 	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"

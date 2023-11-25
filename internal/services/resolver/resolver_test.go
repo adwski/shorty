@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
 
-	"github.com/adwski/shorty/internal/mocks/mockconfig"
+	"github.com/adwski/shorty/internal/storage"
 
 	"go.uber.org/zap"
 
