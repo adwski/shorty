@@ -39,9 +39,8 @@ type File struct {
 }
 
 type Config struct {
-	Logger                 *zap.Logger
-	FilePath               string
-	IgnoreContentOnStartup bool
+	Logger   *zap.Logger
+	FilePath string
 }
 
 func New(cfg *Config) (*File, error) {
@@ -53,10 +52,9 @@ func New(cfg *Config) (*File, error) {
 		st  = memory.New()
 		err error
 	)
-	if !cfg.IgnoreContentOnStartup {
-		if st.DB, err = readURLsFromFile(cfg.FilePath); err != nil {
-			return nil, err
-		}
+
+	if st.DB, err = readURLsFromFile(cfg.FilePath); err != nil {
+		return nil, err
 	}
 
 	if ln := len(st.DB); ln > 0 {
@@ -82,6 +80,7 @@ func (s *File) Store(key string, url string, overwrite bool) error {
 	if err := s.Memory.Store(key, url, overwrite); err != nil {
 		return fmt.Errorf("cannot store url: %w", err)
 	}
+	s.changed = true
 	return nil
 }
 

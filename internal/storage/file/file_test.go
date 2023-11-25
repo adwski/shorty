@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -39,16 +40,16 @@ func TestFileStore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storeFile := "/tmp/testFile" // can we actually mock this?
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			storeFile := "/tmp/testFile" + strconv.Itoa(int(time.Now().Unix()))
 			fs, err := New(&Config{
-				FilePath:               storeFile,
-				IgnoreContentOnStartup: true, // with mock we don't have to do this :(
-				Logger:                 zap.NewExample(),
+				FilePath: storeFile,
+				Logger:   zap.NewExample(),
 			})
 			require.NoError(t, err)
 
+			// Run persistence
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			go fs.Run(ctx, wg)
@@ -83,6 +84,7 @@ func TestFileStore(t *testing.T) {
 			)
 			content, err = os.ReadFile(storeFile)
 			require.NoError(t, err)
+			require.NotEmpty(t, content)
 			err = json.Unmarshal(content, &urlRec)
 			require.NoError(t, err)
 			_, err = uuid.FromString(urlRec.UUID)
