@@ -43,7 +43,7 @@ run:
 
 # Output configuration options
 output:
-  format: github-actions
+  format: colored-line-number
   # Print lines of code with issue.
   print-issued-lines: true
   # Print linter name in the end of issue text.

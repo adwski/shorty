@@ -27,7 +27,7 @@ statictest:
 
 .PHONY: lint
 lint:
-	golangci-lint run ./... --out-format colored-line-number
+	golangci-lint run ./...
 
 .PHONY: goimports
 goimports:
