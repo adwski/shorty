@@ -37,7 +37,6 @@ func TestFileStore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storeFile := "/tmp/testFile" // can we actually mock this?
-			done := make(chan struct{})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fs, err := New(&Config{
@@ -47,7 +46,9 @@ func TestFileStore(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			go fs.Run(ctx, done)
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+			go fs.Run(ctx, wg)
 
 			// store
 			err = fs.Store(tt.args.key, tt.args.url, false)
@@ -60,6 +61,11 @@ func TestFileStore(t *testing.T) {
 			assert.Equal(t, tt.args.url, url)
 
 			// stop persistence
+			done := make(chan struct{})
+			go func() {
+				wg.Wait()
+				done <- struct{}{}
+			}()
 			cancel()
 			select {
 			case <-done:

@@ -47,6 +47,7 @@ type Store struct {
 	db       db
 	filePath string
 	changed  bool
+	shutdown bool
 }
 
 type Config struct {
@@ -90,17 +91,18 @@ func New(cfg *Config) (*Store, error) {
 	}, nil
 }
 
-func (s *Store) Run(ctx context.Context, done chan<- struct{}) {
-	s.maintainPersistence(ctx, done)
+func (s *Store) Run(ctx context.Context, wg *sync.WaitGroup) {
+	s.maintainPersistence(ctx)
+	wg.Done()
 }
 
-func (s *Store) maintainPersistence(ctx context.Context, done chan<- struct{}) {
+func (s *Store) maintainPersistence(ctx context.Context) {
 Loop:
 	for {
 		select {
 		case <-ctx.Done():
+			s.shutdown = true
 			s.persist()
-			done <- struct{}{}
 			break Loop
 		case <-time.After(flushInterval):
 			s.persist()
@@ -207,6 +209,9 @@ func (s *Store) Get(key string) (string, error) {
 }
 
 func (s *Store) Store(key string, url string, overwrite bool) error {
+	if s.shutdown {
+		return errors.New("storage is shutting down")
+	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if _, ok := s.db[key]; ok && !overwrite {

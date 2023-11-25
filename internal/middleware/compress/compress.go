@@ -22,13 +22,13 @@ func New() *Middleware {
 }
 
 type rwWrapper struct {
-	w  http.ResponseWriter
+	http.ResponseWriter
 	cw io.WriteCloser
 	ct string
 }
 
 func newResponseWrapper(w http.ResponseWriter, enc string) *rwWrapper {
-	rw := &rwWrapper{w: w}
+	rw := &rwWrapper{ResponseWriter: w}
 	if strings.Contains(enc, typeGZIP) {
 		rw.ct = typeGZIP
 	} else if strings.Contains(enc, typeDeflate) {
@@ -47,13 +47,13 @@ func (rw *rwWrapper) Write(b []byte) (n int, err error) {
 	if rw.cw != nil {
 		n, err = rw.cw.Write(b)
 	} else {
-		n, err = rw.w.Write(b)
+		n, err = rw.ResponseWriter.Write(b)
 	}
 	return
 }
 
 func (rw *rwWrapper) needCompression() bool {
-	switch rw.w.Header().Get("Content-Type") {
+	switch rw.Header().Get("Content-Type") {
 	case "application/json",
 		"text/plain":
 		return true
@@ -63,19 +63,20 @@ func (rw *rwWrapper) needCompression() bool {
 
 func (rw *rwWrapper) WriteHeader(statusCode int) {
 	if rw.ct != "" && rw.needCompression() {
-		rw.w.Header().Set("Content-Encoding", rw.ct)
+		rw.ResponseWriter.Header().Set("Content-Encoding", rw.ct)
 		switch rw.ct {
 		case typeGZIP:
-			rw.cw = gzip.NewWriter(rw.w)
+			rw.cw = gzip.NewWriter(rw.ResponseWriter)
 		case typeDeflate:
-			rw.cw = zlib.NewWriter(rw.w)
+			rw.cw = zlib.NewWriter(rw.ResponseWriter)
 		}
 	}
-	rw.w.WriteHeader(statusCode)
+	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
-func (rw *rwWrapper) Header() http.Header {
-	return rw.w.Header()
+func (mw *Middleware) ChainFunc(h http.Handler) http.Handler {
+	mw.handler = h
+	return mw
 }
 
 func (mw *Middleware) Chain(h http.Handler) *Middleware {

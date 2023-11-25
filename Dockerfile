@@ -1,4 +1,4 @@
-FROM golang:1.21.4-alpine3.18 as builder
+FROM golang:1.21.4-bookworm
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
@@ -14,15 +14,7 @@ WORKDIR /build
 RUN go test -count=1 -v -cover ./...
 
 # build
-RUN go build -o shorty ./cmd/shortener/main.go \
+RUN go build -o shorty ./cmd/shortener/*.go \
     && chmod +x /build/shorty
 
-
-FROM alpine:3.18
-WORKDIR /shorty
-
-USER 65535
-
-# copy files to image
-COPY --from=builder /build/shorty ./
-ENTRYPOINT ["/shorty/shorty"]
+ENTRYPOINT ["/build/shorty"]

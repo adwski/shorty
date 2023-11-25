@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/adwski/shorty/internal/storage/simple"
+
 	"go.uber.org/zap"
 
 	"github.com/adwski/shorty/internal/app/config"
@@ -23,13 +25,13 @@ func TestShorty(t *testing.T) {
 		compress bool
 	}
 
-	cfg := &config.ShortyConfig{
+	cfg := &config.Shorty{
 		Host:         "xxx.yyy",
 		ServedScheme: "http",
 		Logger:       zap.NewExample(),
+		Storage:      simple.New(),
 	}
-	shorty, err := NewShorty(cfg)
-	require.Nil(t, err)
+	shorty := NewShorty(cfg)
 
 	tests := []struct {
 		name string
@@ -73,7 +75,7 @@ func TestShorty(t *testing.T) {
 			)
 			if tt.args.compress {
 				gzw := gzip.NewWriter(body)
-				_, err = gzw.Write([]byte(bodyContent))
+				_, err := gzw.Write([]byte(bodyContent))
 				require.NoError(t, err)
 				require.NoError(t, gzw.Close())
 				r.Header.Set("Content-Encoding", "gzip")

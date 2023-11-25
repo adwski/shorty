@@ -3,30 +3,34 @@ package config
 import (
 	"errors"
 	"flag"
+	"fmt"
+
 	"net/url"
 	"os"
+
+	"github.com/adwski/shorty/internal/storage/file"
+	"github.com/adwski/shorty/internal/storage/simple"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	StorageKindSimple = iota
-	StorageKindFile
-)
-
-type ShortyConfig struct {
-	Logger          *zap.Logger
-	ListenAddr      string
-	Host            string
-	RedirectScheme  string
-	ServedScheme    string
-	FileStoragePath string
-	Storage         int
-	GenerateReqID   bool
+type Storage interface {
+	Get(key string) (url string, err error)
+	Store(key string, url string, overwrite bool) error
 }
 
-func New() (*ShortyConfig, error) {
+type Shorty struct {
+	Storage        Storage
+	Logger         *zap.Logger
+	ListenAddr     string
+	Host           string
+	RedirectScheme string
+	ServedScheme   string
+	GenerateReqID  bool
+}
+
+func New() (*Shorty, error) {
 	var (
 		listenAddr      = flag.String("a", ":8080", "listen address")
 		baseURL         = flag.String("b", "http://localhost:8080", "base server URL")
@@ -69,26 +73,31 @@ func New() (*ShortyConfig, error) {
 		return nil, errors.Join(errors.New("cannot parse base server URL"), err)
 	}
 
-	var storageKind int
+	var storage Storage
 	if *fileStoragePath == "" {
 		logger.Info("using simple storage")
+		storage = simple.New()
 	} else {
-		storageKind = StorageKindFile
+		if storage, err = file.New(&file.Config{
+			FilePath: *fileStoragePath,
+			Logger:   logger,
+		}); err != nil {
+			return nil, fmt.Errorf("cannot initialize file storage: %w", err)
+		}
 		logger.Info("using file storage")
 	}
 
 	//--------------------------------------------------
 	// Create config
 	//--------------------------------------------------
-	return &ShortyConfig{
-		ListenAddr:      *listenAddr,
-		Host:            bURL.Host,
-		RedirectScheme:  *redirectScheme,
-		ServedScheme:    bURL.Scheme,
-		GenerateReqID:   !*trustRequestID,
-		Logger:          logger,
-		Storage:         storageKind,
-		FileStoragePath: *fileStoragePath,
+	return &Shorty{
+		ListenAddr:     *listenAddr,
+		Host:           bURL.Host,
+		RedirectScheme: *redirectScheme,
+		ServedScheme:   bURL.Scheme,
+		GenerateReqID:  !*trustRequestID,
+		Logger:         logger,
+		Storage:        storage,
 	}, nil
 }
 

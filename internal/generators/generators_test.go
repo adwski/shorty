@@ -46,9 +46,3 @@ func BenchmarkRandString(b *testing.B) {
 		_ = RandString(100)
 	}
 }
-
-func BenchmarkRandStringFallback(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = RandStringFallback(100)
-	}
-}
