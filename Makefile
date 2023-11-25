@@ -31,7 +31,7 @@ lint:
 
 .PHONY: goimports
 goimports:
-	goimports -v -w  .
+	goimports -w  .
 
 .PHONY: test
 test: goimports lint unittests statictest

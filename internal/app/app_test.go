@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage/simple"
+	"github.com/adwski/shorty/internal/mocks/mockconfig"
+	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
 
@@ -24,15 +25,6 @@ func TestShorty(t *testing.T) {
 		url      string
 		compress bool
 	}
-
-	cfg := &config.Shorty{
-		Host:         "xxx.yyy",
-		ServedScheme: "http",
-		Logger:       zap.NewExample(),
-		Storage:      simple.New(),
-	}
-	shorty := NewShorty(cfg)
-
 	tests := []struct {
 		name string
 		args args
@@ -65,6 +57,21 @@ func TestShorty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
+			st := mockconfig.NewStorage(t)
+			st.On("Store", mock.Anything, mock.Anything, false).Return(
+				func(key, val string, _ bool) error {
+					st.EXPECT().Get(key).Return(val, nil)
+					return nil
+				})
+
+			cfg := &config.Shorty{
+				Host:         "xxx.yyy",
+				ServedScheme: "http",
+				Logger:       zap.NewExample(),
+				Storage:      st,
+			}
+			shorty := NewShorty(cfg)
+
 			//-----------------------------------------------------
 			// Store URL
 			//-----------------------------------------------------
