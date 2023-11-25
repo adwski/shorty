@@ -43,7 +43,7 @@ run:
 
 # Output configuration options
 output:
-  #format: json
+  format: github-actions
   # Print lines of code with issue.
   print-issued-lines: true
   # Print linter name in the end of issue text.
@@ -95,7 +95,7 @@ linters-settings:
     ignore-tests: true
     match-constant: true
     min-len: 3
-    min-occurrences: 5
+    min-occurrences: 2
     numbers: false
 
   gocritic:

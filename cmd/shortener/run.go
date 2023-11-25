@@ -33,10 +33,9 @@ func run(log *zap.Logger, shorty *app.Shorty, storage config.Storage) {
 
 	select {
 	case <-ctx.Done():
-		log.Warn("app is shutting down")
-	case err := <-errc:
-		log.Warn("error in app", zap.Error(err))
+		log.Warn("shutting down")
+	case <-errc:
+		cancel()
 	}
-	cancel()
 	wg.Wait()
 }

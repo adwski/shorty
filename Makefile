@@ -1,13 +1,17 @@
+.PHONY: mock
+mock:
+	rm -rf ./mocks
+	mockery
 
-.PHONY: test
-test:
+.PHONY: unittests
+unittests: mock
 	go test ./... -v -count=1 -cover
 
 .PHONY: build
 build:
 	go build -o ./cmd/shortener/shortener ./cmd/shortener/*.go
 
-# Run this like
+# Run it like this
 # > make shortenertest TESTNUM=7
 .PHONY: shortenertest
 shortenertest: build
@@ -23,11 +27,17 @@ statictest:
 
 .PHONY: lint
 lint:
-	golangci-lint run ./... -c .golangci.yml
+	golangci-lint run ./... --out-format colored-line-number
 
 .PHONY: goimports
 goimports:
 	goimports -v -w  .
+
+.PHONY: test
+test: goimports lint unittests statictest
+	for num in 1 2 3 4 5 6 7 8 9; do \
+		$(MAKE) shortenertest TESTNUM=$$num ; \
+	done
 
 .PHONY: docker
 docker:
