@@ -2,7 +2,7 @@ quiet: False
 disable-version-string: True
 with-expecter: True
 mockname: "{{.InterfaceName}}"
-filename: "mock_{{.MockName}}.go"
+filename: "mock_{{.InterfaceName|lower}}.go"
 outpkg: "mock{{.PackageName}}"
 dir: "{{.InterfaceDir}}/mock{{.PackageName}}"
 packages:
