@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,35 +10,88 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
+	"github.com/stretchr/testify/mock"
+
+	"go.uber.org/zap"
+
 	"github.com/adwski/shorty/internal/app/config"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShorty(t *testing.T) {
-	cfg := &config.ShortyConfig{
-		Host:         "xxx.yyy",
-		ServedScheme: "http",
-		Logger:       logrus.New(),
+	type args struct {
+		url      string
+		compress bool
 	}
-	shorty := NewShorty(cfg)
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "http url",
+			args: args{
+				url: "http://aaa.bbb",
+			},
+		},
+		{
+			name: "https url with path",
+			args: args{
+				url: "https://ccc.ddd/123",
+			},
+		},
+		{
+			name: "https url compressed",
+			args: args{
+				url:      "https://ccc.ddd/123",
+				compress: true,
+			},
+		},
+		{
+			name: "https url with port and path",
+			args: args{
+				url: "https://eee.fff:4567/890",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
+			st := mockconfig.NewStorage(t)
+			st.On("Store", mock.Anything, mock.Anything, false).Return(
+				func(key, val string, _ bool) error {
+					st.EXPECT().Get(key).Return(val, nil)
+					return nil
+				})
 
-	testURLs := []string{
-		"http://aaa.bbb",
-		"https://ccc.ddd/123",
-		"https://eee.fff:4567/890",
-	}
-	for _, testURL := range testURLs {
-		t.Run("Storing and getting "+testURL, func(t *testing.T) {
+			cfg := &config.Shorty{
+				Host:         "xxx.yyy",
+				ServedScheme: "http",
+				Logger:       zap.NewExample(),
+				Storage:      st,
+			}
+			shorty := NewShorty(cfg)
 
 			//-----------------------------------------------------
 			// Store URL
 			//-----------------------------------------------------
-			body := []byte(testURL)
-			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+			var (
+				bodyContent = tt.args.url
+				body        = bytes.NewBuffer([]byte{})
+				r           = httptest.NewRequest(http.MethodPost, "/", nil)
+			)
+			if tt.args.compress {
+				gzw := gzip.NewWriter(body)
+				_, err := gzw.Write([]byte(bodyContent))
+				require.NoError(t, err)
+				require.NoError(t, gzw.Close())
+				r.Header.Set("Content-Encoding", "gzip")
+			} else {
+				body.Write([]byte(bodyContent))
+			}
+			r.Body = io.NopCloser(body)
+			r.Header.Set("Content-Length", strconv.Itoa(body.Len()))
 			r.Header.Set("Content-Type", "text/plain")
-			r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 
 			w := httptest.NewRecorder()
 
@@ -79,7 +133,7 @@ func TestShorty(t *testing.T) {
 			assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 
 			// Check headers
-			assert.Equal(t, testURL, res.Header.Get("Location"))
+			assert.Equal(t, tt.args.url, res.Header.Get("Location"))
 		})
 	}
 }

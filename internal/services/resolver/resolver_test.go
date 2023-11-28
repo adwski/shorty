@@ -6,8 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
+
 	"github.com/adwski/shorty/internal/storage"
-	"github.com/sirupsen/logrus"
+
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +19,8 @@ import (
 func TestService_Redirect(t *testing.T) {
 	type args struct {
 		pathLength   uint
-		path         string
+		shortURL     string
+		invalid      bool
 		addToStorage map[string]string
 	}
 	type want struct {
@@ -32,7 +37,7 @@ func TestService_Redirect(t *testing.T) {
 			name: "redirect existing",
 			args: args{
 				pathLength: 10,
-				path:       "/qweasdzxcr",
+				shortURL:   "qweasdzxcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
@@ -48,7 +53,7 @@ func TestService_Redirect(t *testing.T) {
 			name: "redirect existing, different path length",
 			args: args{
 				pathLength: 20,
-				path:       "/qweasdzxcr",
+				shortURL:   "qweasdzxcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
@@ -64,7 +69,7 @@ func TestService_Redirect(t *testing.T) {
 			name: "redirect not existing",
 			args: args{
 				pathLength: 10,
-				path:       "/qweasd1xcr",
+				shortURL:   "qweasd1xcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
@@ -80,7 +85,8 @@ func TestService_Redirect(t *testing.T) {
 			name: "invalid request path",
 			args: args{
 				pathLength: 10,
-				path:       "/qweasd&*zxcrаб",
+				shortURL:   "qweasd&*zxcrаб",
+				invalid:    true,
 				addToStorage: map[string]string{
 					"qweasdzxcr123": "https://aaa.bbb",
 				},
@@ -92,15 +98,22 @@ func TestService_Redirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := &Service{
-				store: storage.NewStorageSimple(),
-				log:   logrus.New(),
-			}
-			for k, v := range tt.args.addToStorage {
-				require.Nil(t, svc.store.Store(k, v, true))
+			st := mockconfig.NewStorage(t)
+
+			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {
+				if !tt.args.invalid {
+					st.EXPECT().Get(tt.args.shortURL).Return("", storage.ErrNotFound)
+				}
+			} else {
+				st.EXPECT().Get(tt.args.shortURL).Return(v, nil)
 			}
 
-			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)
+			svc := &Service{
+				store: st,
+				log:   zap.NewExample(),
+			}
+
+			r := httptest.NewRequest(http.MethodGet, "/"+tt.args.shortURL, nil)
 			w := httptest.NewRecorder()
 			svc.Resolve(w, r)
 
@@ -108,9 +121,9 @@ func TestService_Redirect(t *testing.T) {
 
 			assert.Equal(t, tt.want.status, res.StatusCode)
 
-			defer res.Body.Close()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
+			require.NoError(t, res.Body.Close())
 
 			if tt.want.headers != nil {
 				for k, v := range tt.want.headers {

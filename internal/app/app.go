@@ -1,16 +1,21 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/middleware/compress"
+	"github.com/adwski/shorty/internal/middleware/logging"
+	"github.com/adwski/shorty/internal/middleware/requestid"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -24,51 +29,98 @@ const (
 
 // Shorty is URL shortener app
 // It consists of shortener and redirector services
-// Also it uses key-value storage to store URLs and shortened paths
+// Also it uses key-value storage to store URLs and shortened paths.
 type Shorty struct {
-	log    *logrus.Logger
+	log    *zap.Logger
 	server *http.Server
+	host   string
 }
 
-// NewShorty creates Shorty instance from config
-func NewShorty(cfg *config.ShortyConfig) *Shorty {
-
-	var (
-		store  = storage.NewStorageSimple()
-		router = chi.NewRouter()
-	)
-
-	router.Get("/{path}", resolver.New(&resolver.Config{
-		Store:  store,
-		Logger: cfg.Logger,
-	}).Resolve)
-	router.Post("/", shortener.New(&shortener.Config{
-		Store:          store,
+// NewShorty creates Shorty instance from config.
+func NewShorty(cfg *config.Shorty) *Shorty {
+	shortenerSvc := shortener.New(&shortener.Config{
+		Store:          cfg.Storage,
 		ServedScheme:   cfg.ServedScheme,
 		RedirectScheme: cfg.RedirectScheme,
 		Host:           cfg.Host,
 		Logger:         cfg.Logger,
 		PathLength:     defaultPathLength,
-	}).Shorten)
+	})
+
+	resolverSvc := resolver.New(&resolver.Config{
+		Store:  cfg.Storage,
+		Logger: cfg.Logger,
+	})
+
+	router := chi.NewRouter()
+	router.Use(
+		requestid.New(&requestid.Config{
+			Generate: cfg.GenerateReqID,
+			Logger:   cfg.Logger,
+		}).ChainFunc,
+		logging.New(&logging.Config{
+			Logger: cfg.Logger,
+		}).ChainFunc,
+		compress.New().ChainFunc,
+	)
+
+	router.Post("/", shortenerSvc.ShortenPlain)
+	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
+	router.Get("/{path}", resolverSvc.Resolve)
 
 	return &Shorty{
-		log: cfg.Logger,
+		log:  cfg.Logger,
+		host: cfg.Host,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 			WriteTimeout:      defaultWriteTimeout,
 			IdleTimeout:       defaultIdleTimeout,
-			ErrorLog:          log.New(cfg.Logger.Writer(), "shorty", 0),
+			ErrorLog:          log.New(newSrvLogger(cfg.Logger), "", 0),
 			Handler:           router,
 		},
 	}
 }
 
-func (sh *Shorty) Run() error {
-	sh.log.WithFields(logrus.Fields{
-		"address": sh.server.Addr,
-	}).Info("starting app")
+func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
+	sh.log.Info("starting server",
+		zap.String("address", sh.server.Addr),
+		zap.String("host", sh.host))
 
-	return sh.server.ListenAndServe()
+	errSrv := make(chan error)
+	go func(errc chan error) {
+		errc <- sh.server.ListenAndServe()
+	}(errSrv)
+
+	select {
+	case <-ctx.Done():
+		if err := sh.server.Shutdown(context.Background()); err != nil {
+			sh.log.Error("error during server shutdown", zap.Error(err))
+		}
+
+	case err := <-errSrv:
+		if !errors.Is(err, http.ErrServerClosed) {
+			sh.log.Error("server error", zap.Error(err))
+			errc <- err
+		}
+	}
+
+	sh.log.Warn("server stopped")
+	wg.Done()
+}
+
+type srvLogger struct {
+	logger *zap.Logger
+}
+
+func newSrvLogger(logger *zap.Logger) *srvLogger {
+	return &srvLogger{
+		logger: logger.With(zap.String("type", "server")),
+	}
+}
+
+func (sl *srvLogger) Write(b []byte) (int, error) {
+	sl.logger.Error(string(b))
+	return len(b), nil
 }

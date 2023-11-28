@@ -8,7 +8,6 @@ import (
 )
 
 func TestPath(t *testing.T) {
-
 	tests := []struct {
 		name   string
 		path   string

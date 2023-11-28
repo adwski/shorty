@@ -1,19 +1,22 @@
 package main
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/adwski/shorty/internal/app"
 	"github.com/adwski/shorty/internal/app/config"
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
-
 	cfg, err := config.New()
 	if err != nil {
-		logrus.WithError(err).Fatal("cannot configure app")
+		zap.L().Fatal("cannot configure app", zap.Error(err))
 	}
 
-	if err = app.NewShorty(cfg).Run(); err != nil {
-		cfg.Logger.WithError(err).Fatal("server failure")
+	shorty := app.NewShorty(cfg)
+	if err != nil {
+		cfg.Logger.Fatal("cannot create app", zap.Error(err))
 	}
+
+	run(cfg.Logger, shorty, cfg.Storage)
 }

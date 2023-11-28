@@ -1,10 +1,13 @@
-package simple
+package memory
 
 import (
 	"sync"
 	"testing"
 
-	"github.com/adwski/shorty/internal/errors"
+	"github.com/adwski/shorty/internal/storage/memory/db"
+
+	"github.com/adwski/shorty/internal/storage"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +20,7 @@ func TestNewSimple(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		si      *Simple
+		si      *Memory
 		wantErr bool
 	}{
 		{
@@ -26,12 +29,11 @@ func TestNewSimple(t *testing.T) {
 				key: "aaa",
 				url: "https://bbb.ccc",
 			},
-			si: NewSimple(),
+			si: New(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			err := tt.si.Store(tt.args.key, tt.args.url, false)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -42,7 +44,6 @@ func TestNewSimple(t *testing.T) {
 			url, err2 := tt.si.Get(tt.args.key)
 			require.NoError(t, err2)
 			assert.Equal(t, tt.args.url, url)
-
 		})
 	}
 }
@@ -73,14 +74,18 @@ func TestNewSimple_Get(t *testing.T) {
 				key: "aaa",
 				url: "https://bbb.ccc",
 			},
-			err: errors.ErrNotFound,
+			err: storage.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		store := db.NewDB()
+		for k, v := range tt.args.db {
+			store[k] = db.URLRecord{OriginalURL: v}
+		}
 
-			si := &Simple{
-				st:  tt.args.db,
+		t.Run(tt.name, func(t *testing.T) {
+			si := &Memory{
+				DB:  store,
 				mux: &sync.Mutex{},
 			}
 
@@ -91,7 +96,6 @@ func TestNewSimple_Get(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.err, err)
 			}
-
 		})
 	}
 }
@@ -126,7 +130,7 @@ func TestNewSimple_Store(t *testing.T) {
 				url:       "https://ddd.eee",
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
-				wantErr:   errors.ErrAlreadyExists,
+				wantErr:   storage.ErrAlreadyExists,
 				overwrite: false,
 			},
 		},
@@ -143,11 +147,12 @@ func TestNewSimple_Store(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			si := &Simple{
-				st:  tt.args.beforeDB,
-				mux: &sync.Mutex{},
+			store := db.NewDB()
+			for k, v := range tt.args.beforeDB {
+				store[k] = db.URLRecord{OriginalURL: v}
 			}
+			si := New()
+			si.DB = store
 
 			err := si.Store(tt.args.key, tt.args.url, tt.args.overwrite)
 
@@ -157,7 +162,7 @@ func TestNewSimple_Store(t *testing.T) {
 			} else {
 				require.Nil(t, err)
 			}
-			assert.Equal(t, tt.args.wantDB, si.st)
+			assert.Equal(t, tt.args.wantDB, store.Map())
 		})
 	}
 }

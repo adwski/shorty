@@ -1,7 +1,7 @@
 package generators
 
 import (
-	"math/rand"
+	mrand "math/rand"
 )
 
 var (
@@ -9,11 +9,11 @@ var (
 )
 
 // RandString generates random string with specified length
-// from predefined alphabet
+// from predefined alphabet.
 func RandString(length uint) string {
 	b := make([]byte, length)
 	for i := uint(0); i < length; i++ {
-		b[i] = alphabet[rand.Intn(len(alphabet))]
+		b[i] = alphabet[mrand.Intn(len(alphabet))]
 	}
 	return string(b)
 }

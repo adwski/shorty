@@ -2,6 +2,7 @@ package shortener
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,8 +10,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
-	"github.com/sirupsen/logrus"
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
+
+	"github.com/stretchr/testify/mock"
+
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,17 +23,20 @@ import (
 func TestService_Shorten(t *testing.T) {
 	type args struct {
 		pathLength     uint
-		body           []byte
+		url            string
+		headers        map[string]string
 		addToStorage   map[string]string
 		host           string
 		servedScheme   string
 		redirectScheme string
+		json           bool
+		invalid        bool
 	}
 	type want struct {
 		status    int
 		headers   map[string]string
-		storage   map[string]string
 		emptyBody bool
+		url       string
 	}
 	tests := []struct {
 		name string
@@ -39,7 +47,7 @@ func TestService_Shorten(t *testing.T) {
 			name: "store redirect",
 			args: args{
 				pathLength:   10,
-				body:         []byte("https://aaa.bbb"),
+				url:          "https://aaa.bbb",
 				servedScheme: "http",
 				host:         "ccc.ddd",
 			},
@@ -51,10 +59,30 @@ func TestService_Shorten(t *testing.T) {
 			},
 		},
 		{
+			name: "store redirect json",
+			args: args{
+				pathLength:   10,
+				url:          "https://aaa.bbb",
+				servedScheme: "http",
+				host:         "ccc.ddd",
+				headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+				json: true,
+			},
+			want: want{
+				status: http.StatusCreated,
+				headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+				url: "https://aaa.bbb",
+			},
+		},
+		{
 			name: "store same url",
 			args: args{
 				pathLength:   20,
-				body:         []byte("https://aaa.bbb"),
+				url:          "https://aaa.bbb",
 				servedScheme: "http",
 				host:         "ccc.ddd",
 				addToStorage: map[string]string{
@@ -72,9 +100,10 @@ func TestService_Shorten(t *testing.T) {
 			name: "store url wrong scheme",
 			args: args{
 				pathLength:     20,
-				body:           []byte("http://ccc.ddd"),
+				url:            "http://ccc.ddd",
 				redirectScheme: "https",
 				host:           "eee.fff",
+				invalid:        true,
 			},
 			want: want{
 				status:    http.StatusBadRequest,
@@ -85,7 +114,7 @@ func TestService_Shorten(t *testing.T) {
 			name: "store arbitrary scheme",
 			args: args{
 				pathLength:   20,
-				body:         []byte("https://aaa.bbb"),
+				url:          "https://aaa.bbb",
 				servedScheme: "http",
 				host:         "ccc.ddd",
 			},
@@ -99,11 +128,15 @@ func TestService_Shorten(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Prepare storage
-			simpleStore := storage.NewStorageSimple()
-			for k, v := range tt.args.addToStorage {
-				_ = simpleStore.Store(k, v, true)
+			st := mockconfig.NewStorage(t)
+
+			if !tt.args.invalid {
+				st.On("Store", mock.Anything, mock.Anything, false).Return(
+					func(key, val string, _ bool) error {
+						st.EXPECT().Get(key).Return(val, nil)
+						return nil
+					})
 			}
 
 			// Create Shortener
@@ -112,18 +145,33 @@ func TestService_Shorten(t *testing.T) {
 				servedScheme:   tt.args.servedScheme,
 				redirectScheme: tt.args.redirectScheme,
 				pathLength:     tt.args.pathLength,
-				store:          simpleStore,
-				log:            logrus.New(),
+				store:          st,
+				log:            zap.NewExample(),
 			}
 
 			// Prepare request
-			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(tt.args.body))
-			r.Header.Set("Content-Type", "text/plain")
-			r.Header.Set("Content-Length", strconv.Itoa(len(tt.args.body)))
+			var body []byte
+			if tt.args.json {
+				var jErr error
+				body, jErr = json.Marshal(&ShortenRequest{URL: tt.args.url})
+				require.NoError(t, jErr)
+			} else {
+				body = []byte(tt.args.url)
+			}
+
+			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(body))
+			for k, v := range tt.args.headers {
+				r.Header.Set(k, v)
+			}
+			r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 			w := httptest.NewRecorder()
 
 			// Execute
-			svc.Shorten(w, r)
+			if tt.args.json {
+				svc.ShortenJSON(w, r)
+			} else {
+				svc.ShortenPlain(w, r)
+			}
 			res := w.Result()
 
 			// Check status code
@@ -141,22 +189,35 @@ func TestService_Shorten(t *testing.T) {
 			}
 
 			// Check body
-			defer res.Body.Close()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
+			require.NoError(t, res.Body.Close())
 			require.NotEqual(t, []byte{}, resBody)
 
 			// Check return URL
-			u, err2 := url.Parse(string(resBody))
-			require.NoError(t, err2)
+			var u *url.URL
+			if tt.args.json {
+				var resp ShortenResponse
+				err = json.Unmarshal(resBody, &resp)
+				require.NoError(t, err)
+				u, err = url.Parse(resp.Result)
+				require.NoError(t, err)
+			} else {
+				u, err = url.Parse(string(resBody))
+				require.NoError(t, err)
+			}
 			require.Equal(t, tt.args.pathLength, uint(len(u.Path)-1))
 			require.Equal(t, u.Scheme, tt.args.servedScheme)
 			require.Equal(t, u.Host, tt.args.host)
 
 			// Check storage content
-			storedURL, err3 := simpleStore.Get(u.Path[1:])
+			storedURL, err3 := st.Get(u.Path[1:])
 			require.NoError(t, err3)
-			assert.Equal(t, string(tt.args.body), storedURL)
+			if tt.args.json {
+				assert.Equal(t, tt.want.url, storedURL)
+			} else {
+				assert.Equal(t, tt.args.url, storedURL)
+			}
 		})
 	}
 }

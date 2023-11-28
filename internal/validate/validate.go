@@ -8,7 +8,7 @@ import (
 	"unicode"
 )
 
-// ShortenRequest validates http request for shorten service
+// ShortenRequest validates http request for shorten service.
 func ShortenRequest(req *http.Request) (size int, err error) {
 	cl := req.Header.Get("Content-Length")
 	if cl == "" {
@@ -21,7 +21,15 @@ func ShortenRequest(req *http.Request) (size int, err error) {
 	return
 }
 
-// Path validates http request path for resolver service
+// ShortenRequestJSON validates http request for shorten service json endpoint.
+func ShortenRequestJSON(req *http.Request) (err error) {
+	if req.Header.Get("Content-Type") != "application/json" {
+		err = errors.New("incorrect Content-Type")
+	}
+	return
+}
+
+// Path validates http request path for resolver service.
 func Path(path string) error {
 	for i := 1; i < len(path); i++ {
 		if !unicode.IsLetter(rune(path[i])) && !unicode.IsDigit(rune(path[i])) {
