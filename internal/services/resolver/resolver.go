@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -10,8 +11,7 @@ import (
 )
 
 type Storage interface {
-	Get(key string) (url string, err error)
-	Store(key string, url string, overwrite bool) error
+	Get(ctx context.Context, key string) (url string, err error)
 }
 
 // Service implements http handler for url redirects.
@@ -46,7 +46,7 @@ func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if redirect, err = svc.store.Get(req.URL.Path[1:]); err != nil {
+	if redirect, err = svc.store.Get(req.Context(), req.URL.Path[1:]); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {

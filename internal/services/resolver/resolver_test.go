@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -99,13 +100,14 @@ func TestService_Redirect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := mockconfig.NewStorage(t)
+			ctx := context.Background()
 
 			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {
 				if !tt.args.invalid {
-					st.EXPECT().Get(tt.args.shortURL).Return("", storage.ErrNotFound)
+					st.EXPECT().Get(ctx, tt.args.shortURL).Return("", storage.ErrNotFound)
 				}
 			} else {
-				st.EXPECT().Get(tt.args.shortURL).Return(v, nil)
+				st.EXPECT().Get(ctx, tt.args.shortURL).Return(v, nil)
 			}
 
 			svc := &Service{

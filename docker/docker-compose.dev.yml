@@ -1,0 +1,47 @@
+---
+version: "3.8"
+
+x-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "100k"
+    max-file: "5"
+
+services:
+  postgres:
+    logging: *logging
+    image: postgres:16.1-bullseye
+    environment:
+      POSTGRES_DB: shorty
+      POSTGRES_USER: shorty
+      POSTGRES_PASSWORD: shorty
+    volumes:
+      - shorty-db:/var/lib/postgresql/data
+    #  - ./db/init/:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
+    networks:
+      - shorty
+
+  shorty:
+    logging: *logging
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+    environment:
+      DATABASE_DSN: postgres://shorty:shorty@postgres:5432/shorty
+      SERVER_ADDRESS: 0.0.0.0:8080
+      BASE_URL: http://localhost:8080
+    ports:
+      - "8888:8888"
+    networks:
+      - shorty
+
+networks:
+  shorty:
+    name: shorty-net
+    driver: bridge
+
+volumes:
+  shorty-db: {}

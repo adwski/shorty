@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"sync"
@@ -28,7 +29,7 @@ func New() *Memory {
 	}
 }
 
-func (m *Memory) Get(key string) (string, error) {
+func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	record, ok := m.DB[key]
@@ -38,20 +39,29 @@ func (m *Memory) Get(key string) (string, error) {
 	return record.OriginalURL, nil
 }
 
-func (m *Memory) Store(key string, url string, overwrite bool) error {
+func (m *Memory) Store(_ context.Context, key string, url string, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if _, ok := m.DB[key]; ok && !overwrite {
-		return storage.ErrAlreadyExists
+		return "", storage.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()
 	if err != nil {
-		return fmt.Errorf("cannot generate key uuid: %w", err)
+		return "", fmt.Errorf("cannot generate key uuid: %w", err)
 	}
 	m.DB[key] = db.URLRecord{
 		UUID:        u.String(),
 		ShortURL:    key,
 		OriginalURL: url,
+	}
+	return "", nil
+}
+
+func (m *Memory) StoreBatch(ctx context.Context, keys []string, urls []string) error {
+	for i := range keys {
+		if _, err := m.Store(ctx, keys[i], urls[i], false); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -58,9 +59,9 @@ func TestShorty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
 			st := mockconfig.NewStorage(t)
-			st.On("Store", mock.Anything, mock.Anything, false).Return(
-				func(key, val string, _ bool) error {
-					st.EXPECT().Get(key).Return(val, nil)
+			st.On("Store", mock.Anything, mock.Anything, mock.Anything, false).Return(
+				func(_ context.Context, key, val string, _ bool) error {
+					st.EXPECT().Get(mock.Anything, key).Return(val, nil)
 					return nil
 				})
 

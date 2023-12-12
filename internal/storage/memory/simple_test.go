@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -34,14 +35,15 @@ func TestNewSimple(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.si.Store(tt.args.key, tt.args.url, false)
+			ctx := context.Background()
+			err := tt.si.Store(ctx, tt.args.key, tt.args.url, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 
-			url, err2 := tt.si.Get(tt.args.key)
+			url, err2 := tt.si.Get(ctx, tt.args.key)
 			require.NoError(t, err2)
 			assert.Equal(t, tt.args.url, url)
 		})
@@ -89,7 +91,7 @@ func TestNewSimple_Get(t *testing.T) {
 				mux: &sync.Mutex{},
 			}
 
-			url, err := si.Get(tt.args.key)
+			url, err := si.Get(context.Background(), tt.args.key)
 			if tt.err == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.args.url, url)
@@ -154,7 +156,7 @@ func TestNewSimple_Store(t *testing.T) {
 			si := New()
 			si.DB = store
 
-			err := si.Store(tt.args.key, tt.args.url, tt.args.overwrite)
+			err := si.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)

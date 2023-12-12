@@ -40,6 +40,7 @@ func TestFileStore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storeFile := "/tmp/testFile" + strconv.Itoa(int(time.Now().Unix()))
 			fs, err := New(&Config{
 				FilePath: storeFile,
@@ -48,19 +49,19 @@ func TestFileStore(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run persistence
-			ctx, cancel := context.WithCancel(context.Background())
+			pCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
-			go fs.Run(ctx, wg)
+			go fs.Run(pCtx, wg)
 
 			// store
-			err = fs.Store(tt.args.key, tt.args.url, false)
+			err = fs.Store(ctx, tt.args.key, tt.args.url, false)
 			require.NoError(t, err)
 
 			// get
 			var url string
-			url, err = fs.Get(tt.args.key)
+			url, err = fs.Get(ctx, tt.args.key)
 			require.NoError(t, err)
 			assert.Equal(t, tt.args.url, url)
 
@@ -137,7 +138,7 @@ func TestStore_Get(t *testing.T) {
 				}
 			}
 
-			url, err := fs.Get(tt.args.key)
+			url, err := fs.Get(context.Background(), tt.args.key)
 			if tt.err == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.args.url, url)
@@ -206,7 +207,7 @@ func TestStore_Store(t *testing.T) {
 				}
 			}
 
-			err := fs.Store(tt.args.key, tt.args.url, tt.args.overwrite)
+			err := fs.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)

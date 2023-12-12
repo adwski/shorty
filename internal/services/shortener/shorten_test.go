@@ -2,6 +2,7 @@ package shortener
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -130,11 +131,14 @@ func TestService_Shorten(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Prepare storage
 			st := mockconfig.NewStorage(t)
+			ctx := context.Background()
 
 			if !tt.args.invalid {
-				st.On("Store", mock.Anything, mock.Anything, false).Return(
-					func(key, val string, _ bool) error {
-						st.EXPECT().Get(key).Return(val, nil)
+				t.Log("registering mock expect")
+				st.On("Store", context.Background(), mock.Anything, mock.Anything, false).Return(
+					func(_ context.Context, key, val string, _ bool) error {
+						t.Log("registering mock get", key, val)
+						st.EXPECT().Get(ctx, key).Return(val, nil)
 						return nil
 					})
 			}
@@ -211,7 +215,7 @@ func TestService_Shorten(t *testing.T) {
 			require.Equal(t, u.Host, tt.args.host)
 
 			// Check storage content
-			storedURL, err3 := st.Get(u.Path[1:])
+			storedURL, err3 := st.Get(ctx, u.Path[1:])
 			require.NoError(t, err3)
 			if tt.args.json {
 				assert.Equal(t, tt.want.url, storedURL)

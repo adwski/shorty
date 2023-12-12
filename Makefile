@@ -15,11 +15,18 @@ build:
 # > make shortenertest TESTNUM=7
 .PHONY: shortenertest
 shortenertest: build
-	shortenertestbeta -test.v -test.run=^TestIteration$(TESTNUM)$$ \
-                  -binary-path=cmd/shortener/shortener \
-                  -source-path=. \
-                  -server-port=$$(random unused-port) \
-                  -file-storage-path=/tmp/short-url-db-test.json
+	for num in 1 2 3 4 5 6 7 8 9; do \
+		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
+                      -binary-path=cmd/shortener/shortener \
+                      -source-path=. \
+                      -server-port=$$(random unused-port) \
+                      -file-storage-path=/tmp/short-url-db-test.json ; \
+	done ; \
+	for num in 10 11 12 13; do \
+		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
+                      -binary-path=cmd/shortener/shortener \
+                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty' ; \
+	done
 
 .PHONY: statictest
 statictest:
@@ -34,11 +41,24 @@ goimports:
 	goimports -w  .
 
 .PHONY: test
-test: mock goimports lint unittests statictest
-	for num in 1 2 3 4 5 6 7 8 9; do \
-		$(MAKE) shortenertest TESTNUM=$$num ; \
-	done
+test: mock goimports lint unittests statictest shortenertest
 
-.PHONY: docker
-docker:
-	docker build -t shorty:latest .
+.PHONY: image-prod
+image-release:
+	docker build -t shorty:prod --target release -f docker/Dockerfile .
+
+.PHONY: image-dev
+image-dev:
+	docker build -t shorty:dev --target dev -f docker/Dockerfile .
+
+.PHONY: docker-dev
+docker-dev:
+	cd docker ;\
+	docker compose up -d
+	docker ps
+
+.PHONY: docker-dev-clean
+docker-dev-clean:
+	cd docker ;\
+	docker compose down -v
+

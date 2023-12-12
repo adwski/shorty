@@ -3,6 +3,7 @@ package shortener
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -19,8 +20,9 @@ const (
 )
 
 type Storage interface {
-	Get(key string) (url string, err error)
-	Store(key string, url string, overwrite bool) error
+	Get(ctx context.Context, key string) (url string, err error)
+	Store(ctx context.Context, key string, url string, overwrite bool) (string, error)
+	StoreBatch(ctx context.Context, keys []string, urls []string) error
 }
 
 // Service implements http handler for shortened urls management.
@@ -37,20 +39,39 @@ func (svc *Service) getServedURL(shortPath string) string {
 	return fmt.Sprintf("%s://%s/%s", svc.servedScheme, svc.host, shortPath)
 }
 
-func (svc *Service) storeURL(u string) (path string, err error) {
+func (svc *Service) storeURL(ctx context.Context, u string) (path string, err error) {
+	if path, err = svc.genUniqueHash(ctx); err != nil {
+		return
+	}
+
+	svc.log.Debug("storing url",
+		zap.String("key", path),
+		zap.String("url", u))
+
+	var storedPath string
+	if storedPath, err = svc.store.Store(ctx, path, u, false); err != nil {
+		if errors.Is(err, storage.ErrConflict) {
+			path = storedPath
+		}
+	}
+	return
+}
+
+func (svc *Service) genUniqueHash(ctx context.Context) (hash string, err error) {
 	for try := 0; try <= defaultMaxTries; try++ {
 		if try == defaultMaxTries {
-			err = errors.New("given up creating redirect")
+			err = errors.New("given up generating hash")
 			return
 		}
-		path = generators.RandString(svc.pathLength)
-		if err = svc.store.Store(path, u, false); err != nil {
-			if errors.Is(err, storage.ErrAlreadyExists) {
-				continue
+		hash = generators.RandString(svc.pathLength)
+
+		if _, err = svc.store.Get(ctx, hash); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				err = nil
+				break
 			}
-			return
+			break
 		}
-		break
 	}
 	return
 }

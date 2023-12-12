@@ -73,11 +73,22 @@ func New(cfg *Config) (*File, error) {
 	}, nil
 }
 
-func (s *File) Store(key string, url string, overwrite bool) error {
+func (s *File) Store(ctx context.Context, key string, url string, overwrite bool) (string, error) {
+	if s.shutdown {
+		return "", errors.New("storage is shutting down")
+	}
+	if _, err := s.Memory.Store(ctx, key, url, overwrite); err != nil {
+		return "", fmt.Errorf("cannot store url: %w", err)
+	}
+	s.changed = true
+	return "", nil
+}
+
+func (s *File) StoreBatch(ctx context.Context, keys []string, urls []string) error {
 	if s.shutdown {
 		return errors.New("storage is shutting down")
 	}
-	if err := s.Memory.Store(key, url, overwrite); err != nil {
+	if err := s.Memory.StoreBatch(ctx, keys, urls); err != nil {
 		return fmt.Errorf("cannot store url: %w", err)
 	}
 	s.changed = true
