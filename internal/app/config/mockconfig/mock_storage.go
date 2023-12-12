@@ -79,21 +79,31 @@ func (_c *Storage_Get_Call) RunAndReturn(run func(context.Context, string) (stri
 }
 
 // Store provides a mock function with given fields: ctx, key, url, overwrite
-func (_m *Storage) Store(ctx context.Context, key string, url string, overwrite bool) error {
+func (_m *Storage) Store(ctx context.Context, key string, url string, overwrite bool) (string, error) {
 	ret := _m.Called(ctx, key, url, overwrite)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) error); ok {
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) (string, error)); ok {
+		return rf(ctx, key, url, overwrite)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) string); ok {
 		r0 = rf(ctx, key, url, overwrite)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
+		r1 = rf(ctx, key, url, overwrite)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Storage_Store_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Store'
@@ -117,12 +127,12 @@ func (_c *Storage_Store_Call) Run(run func(ctx context.Context, key string, url 
 	return _c
 }
 
-func (_c *Storage_Store_Call) Return(_a0 error) *Storage_Store_Call {
-	_c.Call.Return(_a0)
+func (_c *Storage_Store_Call) Return(_a0 string, _a1 error) *Storage_Store_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *Storage_Store_Call) RunAndReturn(run func(context.Context, string, string, bool) error) *Storage_Store_Call {
+func (_c *Storage_Store_Call) RunAndReturn(run func(context.Context, string, string, bool) (string, error)) *Storage_Store_Call {
 	_c.Call.Return(run)
 	return _c
 }

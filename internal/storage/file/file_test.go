@@ -56,7 +56,7 @@ func TestFileStore(t *testing.T) {
 			go fs.Run(pCtx, wg)
 
 			// store
-			err = fs.Store(ctx, tt.args.key, tt.args.url, false)
+			_, err = fs.Store(ctx, tt.args.key, tt.args.url, false)
 			require.NoError(t, err)
 
 			// get
@@ -207,7 +207,7 @@ func TestStore_Store(t *testing.T) {
 				}
 			}
 
-			err := fs.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
+			_, err := fs.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)

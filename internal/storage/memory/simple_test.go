@@ -36,7 +36,7 @@ func TestNewSimple(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			err := tt.si.Store(ctx, tt.args.key, tt.args.url, false)
+			_, err := tt.si.Store(ctx, tt.args.key, tt.args.url, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -156,7 +156,7 @@ func TestNewSimple_Store(t *testing.T) {
 			si := New()
 			si.DB = store
 
-			err := si.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
+			_, err := si.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)
