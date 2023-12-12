@@ -118,7 +118,7 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 	for i := range batch {
 		result = append(result, BatchShortened{
 			ID:    batch[i].ID,
-			Short: keys[i],
+			Short: svc.getServedURL(keys[i]),
 		})
 	}
 

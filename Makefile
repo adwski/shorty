@@ -25,6 +25,7 @@ shortenertest: build
 	for num in 10 11 12 13; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
+                      -source-path=. \
                       -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty' ; \
 	done
 
