@@ -50,18 +50,19 @@ func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if shortPath, err = svc.storeURL(req.Context(), srcURL.String()); err != nil {
-		if errors.Is(err, storage.ErrConflict) {
-			w.WriteHeader(http.StatusConflict)
-		} else {
+		if !errors.Is(err, storage.ErrConflict) {
 			w.WriteHeader(http.StatusInternalServerError)
 			svc.log.Error("cannot store url", zap.Error(err))
 			return
 		}
-	} else {
-		w.WriteHeader(http.StatusCreated)
 	}
 
 	w.Header().Set(headerContentType, "text/plain")
+	if errors.Is(err, storage.ErrConflict) {
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
 		svc.log.Error("error writing body", zap.Error(err))
 	}

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/adwski/shorty/internal/storage"
+
 	"github.com/adwski/shorty/internal/app/config/mockconfig"
 	"github.com/stretchr/testify/mock"
 
@@ -59,10 +61,12 @@ func TestShorty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
 			st := mockconfig.NewStorage(t)
+			st.On("Get", mock.Anything, mock.Anything).Once().Return("", storage.ErrNotFound)
 			st.On("Store", mock.Anything, mock.Anything, mock.Anything, false).Return(
-				func(_ context.Context, key, val string, _ bool) error {
+				func(_ context.Context, key, val string, _ bool) (string, error) {
+					t.Log("registering mock get", key, val)
 					st.EXPECT().Get(mock.Anything, key).Return(val, nil)
-					return nil
+					return "", nil
 				})
 
 			cfg := &config.Shorty{

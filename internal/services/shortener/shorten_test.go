@@ -11,9 +11,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/app/config/mockconfig"
-
+	"github.com/adwski/shorty/internal/storage"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/adwski/shorty/internal/app/config/mockconfig"
 
 	"go.uber.org/zap"
 
@@ -135,11 +136,12 @@ func TestService_Shorten(t *testing.T) {
 
 			if !tt.args.invalid {
 				t.Log("registering mock expect")
-				st.On("Store", context.Background(), mock.Anything, mock.Anything, false).Return(
-					func(_ context.Context, key, val string, _ bool) error {
+				st.On("Get", mock.Anything, mock.Anything).Once().Return("", storage.ErrNotFound)
+				st.On("Store", mock.Anything, mock.Anything, mock.Anything, false).Return(
+					func(_ context.Context, key, val string, _ bool) (string, error) {
 						t.Log("registering mock get", key, val)
 						st.EXPECT().Get(ctx, key).Return(val, nil)
-						return nil
+						return "", nil
 					})
 			}
 
