@@ -20,13 +20,13 @@ shortenertest: build
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \
                       -server-port=$$(random unused-port) \
-                      -file-storage-path=/tmp/short-url-db-test.json ; \
-	done ; \
+                      -file-storage-path=/tmp/short-url-db-test.json || exit 1 ; \
+	done
 	for num in 10 11 12 13; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \
-                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty' ; \
+                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty' || exit 1 ; \
 	done
 
 .PHONY: statictest
@@ -62,4 +62,3 @@ docker-dev:
 docker-dev-clean:
 	cd docker ;\
 	docker compose down -v
-

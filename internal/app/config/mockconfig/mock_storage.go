@@ -78,6 +78,52 @@ func (_c *Storage_Get_Call) RunAndReturn(run func(context.Context, string) (stri
 	return _c
 }
 
+// Ping provides a mock function with given fields: ctx
+func (_m *Storage) Ping(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Ping")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Storage_Ping_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ping'
+type Storage_Ping_Call struct {
+	*mock.Call
+}
+
+// Ping is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *Storage_Expecter) Ping(ctx interface{}) *Storage_Ping_Call {
+	return &Storage_Ping_Call{Call: _e.mock.On("Ping", ctx)}
+}
+
+func (_c *Storage_Ping_Call) Run(run func(ctx context.Context)) *Storage_Ping_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *Storage_Ping_Call) Return(_a0 error) *Storage_Ping_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Storage_Ping_Call) RunAndReturn(run func(context.Context) error) *Storage_Ping_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Store provides a mock function with given fields: ctx, key, url, overwrite
 func (_m *Storage) Store(ctx context.Context, key string, url string, overwrite bool) (string, error) {
 	ret := _m.Called(ctx, key, url, overwrite)

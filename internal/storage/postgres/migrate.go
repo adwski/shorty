@@ -11,19 +11,36 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
+func (pg *Postgres) migrate() error {
+	if !pg.doMigration {
+		return nil
+	}
+	pg.log.Warn("starting migration")
+	change, err := runMigrations(pg.dsn, pg.migrationSSLOff)
+	if err != nil {
+		return err
+	}
+	if change {
+		pg.log.Warn("migration is complete")
+	} else {
+		pg.log.Warn("db is up to date")
+	}
+	return nil
+}
+
 //go:embed migrations/*.sql
 var migrationsDir embed.FS
 
-func runMigrations(dsn string, enforceDisableSSL bool) error {
+func runMigrations(dsn string, enforceDisableSSL bool) (bool, error) {
 	d, err := iofs.New(migrationsDir, "migrations")
 	if err != nil {
-		return fmt.Errorf("failed to return an iofs driver: %w", err)
+		return false, fmt.Errorf("failed to return an iofs driver: %w", err)
 	}
 
 	if enforceDisableSSL {
 		u, err := url.Parse(dsn)
 		if err != nil {
-			return fmt.Errorf("cannot parse dns: %w", err)
+			return false, fmt.Errorf("cannot parse dns: %w", err)
 		}
 		values := u.Query()
 		values.Set("sslmode", "disable")
@@ -32,12 +49,13 @@ func runMigrations(dsn string, enforceDisableSSL bool) error {
 	}
 	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
 	if err != nil {
-		return fmt.Errorf("failed to get a new migrate instance: %w", err)
+		return false, fmt.Errorf("failed to get a new migrate instance: %w", err)
 	}
-	if err := m.Up(); err != nil {
+	if err = m.Up(); err != nil {
 		if !errors.Is(err, migrate.ErrNoChange) {
-			return fmt.Errorf("failed to apply migrations to the DB: %w", err)
+			return false, fmt.Errorf("failed to apply migrations to the DB: %w", err)
 		}
+		return true, nil
 	}
-	return nil
+	return false, nil
 }

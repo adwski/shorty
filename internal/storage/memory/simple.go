@@ -73,3 +73,7 @@ func (m *Memory) Dump() db.DB {
 	maps.Copy(dump, m.DB)
 	return dump
 }
+
+func (m *Memory) Ping(_ context.Context) error {
+	return nil
+}

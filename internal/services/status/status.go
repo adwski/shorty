@@ -2,7 +2,6 @@ package status
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -18,17 +17,18 @@ type Service struct {
 }
 
 type Config struct {
-	Storage any
+	Storage Pingable
+	Logger  *zap.Logger
 }
 
-func New(cfg *Config) (*Service, error) {
-	if store, ok := cfg.Storage.(Pingable); ok {
-		return &Service{store: store}, nil
+func New(cfg *Config) *Service {
+	return &Service{
+		store: cfg.Storage,
+		log:   cfg.Logger,
 	}
-	return nil, fmt.Errorf("storage is not Pingable")
 }
 
-func (svc *Service) PingStorage(w http.ResponseWriter, req *http.Request) {
+func (svc *Service) Ping(w http.ResponseWriter, req *http.Request) {
 	err := svc.store.Ping(req.Context())
 	if err != nil {
 		svc.log.Error("storage ping unsuccessful", zap.Error(err))

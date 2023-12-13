@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -34,14 +33,6 @@ func New(cfg *Config) (*Postgres, error) {
 		return nil, errors.New("nil logger")
 	}
 
-	if cfg.Migrate {
-		cfg.Logger.Warn("starting migration")
-		if err := runMigrations(cfg.DSN, cfg.EnforceDisableSSLOnMigration); err != nil {
-			return nil, fmt.Errorf("migration failure: %w", err)
-		}
-		cfg.Logger.Warn("migration is complete")
-	}
-
 	pCfg, err := pgxpool.ParseConfig(cfg.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse DSN: %w", err)
@@ -63,10 +54,11 @@ func New(cfg *Config) (*Postgres, error) {
 	pCfg.MinConns = defaultMinConns
 	pCfg.HealthCheckPeriod = defaultHealthCheckPeriod
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), pCfg)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create pgx connection pool: %w", err)
-	}
-
-	return &Postgres{Pool: pool}, nil
+	return &Postgres{
+		config:          pCfg,
+		log:             cfg.Logger,
+		dsn:             cfg.DSN,
+		doMigration:     cfg.Migrate,
+		migrationSSLOff: cfg.EnforceDisableSSLOnMigration,
+	}, nil
 }

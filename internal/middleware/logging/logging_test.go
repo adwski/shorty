@@ -25,10 +25,14 @@ const (
 type stub struct {
 	status int
 	body   string
+	panic  bool
 }
 
 func (s *stub) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	<-time.After(fakeResponseDuration)
+	if s.panic {
+		panic("yay")
+	}
 	w.WriteHeader(s.status)
 	_, _ = w.Write([]byte(s.body))
 }
@@ -88,6 +92,7 @@ func TestMiddleware(t *testing.T) {
 		method string
 		path   string
 		body   string
+		panic  bool
 	}
 	tests := []struct {
 		name string
@@ -102,6 +107,14 @@ func TestMiddleware(t *testing.T) {
 				body:   "qweqwe",
 			},
 		},
+		{
+			name: "request with panic",
+			args: args{
+				method: http.MethodGet,
+				path:   "/",
+				panic:  true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,6 +126,7 @@ func TestMiddleware(t *testing.T) {
 			s := &stub{
 				status: tt.args.status,
 				body:   tt.args.body,
+				panic:  tt.args.panic,
 			}
 			mw.Chain(s)
 
@@ -126,9 +140,12 @@ func TestMiddleware(t *testing.T) {
 			require.Nil(t, err)
 			require.Nil(t, resp.Body.Close())
 
-			assert.Equal(t, tt.args.status, resp.StatusCode)
-			assert.Equal(t, tt.args.body, string(body))
-
+			if tt.args.panic {
+				assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+			} else {
+				assert.Equal(t, tt.args.status, resp.StatusCode)
+				assert.Equal(t, tt.args.body, string(body))
+			}
 			logOut := bufio.NewReader(buf)
 
 			_, _ = logOut.ReadString('\x01')
@@ -150,10 +167,13 @@ func TestMiddleware(t *testing.T) {
 			errj2 := json.Unmarshal(line2[:len(line2)-1], logFields2)
 			require.Nil(t, errj2)
 
-			assert.Equal(t, "response", logFields2.Msg)
-			assert.Equal(t, len(tt.args.body), logFields2.Size)
-			assert.Equal(t, tt.args.status, logFields2.Status)
-
+			if tt.args.panic {
+				assert.Equal(t, "panic in handler chain", logFields2.Msg, string(line2[:len(line2)-1]))
+			} else {
+				assert.Equal(t, "response", logFields2.Msg)
+				assert.Equal(t, len(tt.args.body), logFields2.Size)
+				assert.Equal(t, tt.args.status, logFields2.Status)
+			}
 			assert.True(t, logFields2.Duration.Std() > fakeResponseDuration,
 				fmt.Sprintf("response duration %v should be greater than %v",
 					logFields2.Duration, fakeResponseDuration))

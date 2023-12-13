@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adwski/shorty/internal/middleware/recovering"
-
 	"github.com/adwski/shorty/internal/app/config"
 	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
@@ -55,29 +53,28 @@ func NewShorty(cfg *config.Shorty) *Shorty {
 		Logger: cfg.Logger,
 	})
 
+	statusSvc := status.New(&status.Config{
+		Storage: cfg.Storage,
+		Logger:  cfg.Logger,
+	})
+
 	router := chi.NewRouter()
 	router.Use(
-		recovering.New(&recovering.Config{Logger: cfg.Logger}).ChainFunc,
 		requestid.New(&requestid.Config{
 			Generate: cfg.GenerateReqID,
 			Logger:   cfg.Logger,
-		}).ChainFunc,
+		}).HandlerFunc,
 		logging.New(&logging.Config{
 			Logger: cfg.Logger,
-		}).ChainFunc,
-		compress.New().ChainFunc,
+		}).HandlerFunc,
+		compress.New().HandlerFunc,
 	)
 
 	router.Post("/", shortenerSvc.ShortenPlain)
 	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
 	router.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
 	router.Get("/{path}", resolverSvc.Resolve)
-
-	if statusSvc, err := status.New(&status.Config{Storage: cfg.Storage}); err == nil {
-		router.Get("/ping", statusSvc.PingStorage)
-	} else {
-		cfg.Logger.Debug("ping is not mounted", zap.Error(err))
-	}
+	router.Get("/ping", statusSvc.Ping)
 
 	return &Shorty{
 		log:  cfg.Logger,

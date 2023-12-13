@@ -21,6 +21,7 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, key string, url string, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, keys []string, urls []string) error
+	Ping(ctx context.Context) error
 }
 
 type Shorty struct {
