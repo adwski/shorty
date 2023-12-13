@@ -114,7 +114,8 @@ func envOverride(name string, param *string) {
 func initStorage(
 	logger *zap.Logger,
 	databaseDSN, fileStoragePath *string,
-	disableSSLOnMigration *bool) (storage Storage, err error) {
+	disableSSLOnMigration *bool,
+) (storage Storage, err error) {
 	switch {
 	case *databaseDSN != "":
 		if storage, err = postgres.New(&postgres.Config{

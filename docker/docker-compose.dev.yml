@@ -17,7 +17,6 @@ services:
       POSTGRES_PASSWORD: shorty
     volumes:
       - shorty-db:/var/lib/postgresql/data
-    #  - ./db/init/:/docker-entrypoint-initdb.d/
     ports:
       - "5432:5432"
     networks:

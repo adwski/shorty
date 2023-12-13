@@ -15,15 +15,15 @@ func (pg *Postgres) migrate() error {
 	if !pg.doMigration {
 		return nil
 	}
-	pg.log.Warn("starting migration")
+	pg.log.Debug("starting migration")
 	change, err := runMigrations(pg.dsn, pg.migrationSSLOff)
 	if err != nil {
 		return err
 	}
 	if change {
-		pg.log.Warn("migration is complete")
+		pg.log.Info("migration is complete")
 	} else {
-		pg.log.Warn("db is up to date")
+		pg.log.Debug("db is up to date")
 	}
 	return nil
 }
