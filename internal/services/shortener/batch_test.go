@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/adwski/shorty/internal/app/config/mockconfig"
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,11 +18,10 @@ import (
 
 func TestService_ShortenBatch(t *testing.T) {
 	type args struct {
-		batch        []BatchURL
-		serveHost    string
-		serveScheme  string
-		pathLen      uint
-		shortenPaths []string
+		batch       []BatchURL
+		serveHost   string
+		serveScheme string
+		pathLen     uint
 	}
 	tests := []struct {
 		name string
@@ -45,7 +43,6 @@ func TestService_ShortenBatch(t *testing.T) {
 						URL: "http://asd.asd",
 					},
 				},
-				shortenPaths: []string{"qwe1231", "rty4564"},
 			},
 		},
 	}
@@ -58,7 +55,6 @@ func TestService_ShortenBatch(t *testing.T) {
 			// Prepare mock calls
 			var urls []string
 			for _, u := range tt.args.batch {
-				st.On("Get", mock.Anything, mock.Anything).Once().Return("", storage.ErrNotFound)
 				urls = append(urls, u.URL)
 			}
 			st.EXPECT().StoreBatch(mock.Anything, mock.Anything, urls).Return(nil)

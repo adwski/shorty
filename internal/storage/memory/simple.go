@@ -57,10 +57,26 @@ func (m *Memory) Store(_ context.Context, key string, url string, overwrite bool
 	return "", nil
 }
 
-func (m *Memory) StoreBatch(ctx context.Context, keys []string, urls []string) error {
+func (m *Memory) StoreBatch(_ context.Context, keys []string, urls []string) error {
+	if len(keys) != len(urls) {
+		return fmt.Errorf("incorrect number of arguments: keys: %d, urls: %d", len(keys), len(urls))
+	}
+	m.mux.Lock()
+	defer m.mux.Unlock()
 	for i := range keys {
-		if _, err := m.Store(ctx, keys[i], urls[i], false); err != nil {
-			return err
+		if _, ok := m.DB[keys[i]]; ok {
+			return storage.ErrAlreadyExists
+		}
+	}
+	for i := range keys {
+		u, err := m.gen.NewV4()
+		if err != nil {
+			return fmt.Errorf("cannot generate key uuid: %w", err)
+		}
+		m.DB[keys[i]] = db.URLRecord{
+			UUID:        u.String(),
+			ShortURL:    keys[i],
+			OriginalURL: urls[i],
 		}
 	}
 	return nil

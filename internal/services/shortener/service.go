@@ -11,12 +11,13 @@ import (
 	"net/url"
 
 	"github.com/adwski/shorty/internal/generators"
+
 	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultMaxTries = 10
+	defaultStoreRetries = 3
 )
 
 type Storage interface {
@@ -40,39 +41,25 @@ func (svc *Service) getServedURL(shortPath string) string {
 }
 
 func (svc *Service) storeURL(ctx context.Context, u string) (path string, err error) {
-	if path, err = svc.genUniqueHash(ctx); err != nil {
+	for i := 1; i <= defaultStoreRetries; i++ {
+		path = generators.RandString(svc.pathLength)
+
+		svc.log.Debug("storing url",
+			zap.String("key", path),
+			zap.Int("try", i),
+			zap.String("url", u))
+
+		var storedPath string
+		if storedPath, err = svc.store.Store(ctx, path, u, false); err != nil {
+			if errors.Is(err, storage.ErrConflict) {
+				path = storedPath
+				return
+			}
+			continue
+		}
 		return
 	}
-
-	svc.log.Debug("storing url",
-		zap.String("key", path),
-		zap.String("url", u))
-
-	var storedPath string
-	if storedPath, err = svc.store.Store(ctx, path, u, false); err != nil {
-		if errors.Is(err, storage.ErrConflict) {
-			path = storedPath
-		}
-	}
-	return
-}
-
-func (svc *Service) genUniqueHash(ctx context.Context) (hash string, err error) {
-	for try := 0; try <= defaultMaxTries; try++ {
-		if try == defaultMaxTries {
-			err = errors.New("given up generating hash")
-			return
-		}
-		hash = generators.RandString(svc.pathLength)
-
-		if _, err = svc.store.Get(ctx, hash); err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				err = nil
-				break
-			}
-			break
-		}
-	}
+	err = fmt.Errorf("cannot store url: %w", err)
 	return
 }
 

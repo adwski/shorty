@@ -15,12 +15,11 @@ import (
 
 // Postgres is a PostgreSQL storage type.
 type Postgres struct {
-	pool            *pgxpool.Pool
-	config          *pgxpool.Config
-	log             *zap.Logger
-	dsn             string
-	doMigration     bool
-	migrationSSLOff bool
+	pool        *pgxpool.Pool
+	config      *pgxpool.Config
+	log         *zap.Logger
+	dsn         string
+	doMigration bool
 }
 
 func (pg *Postgres) Init(ctx context.Context) error {
@@ -76,6 +75,9 @@ func (pg *Postgres) Store(ctx context.Context, hash, url string, overwrite bool)
 }
 
 func (pg *Postgres) StoreBatch(ctx context.Context, keys []string, urls []string) error {
+	if len(keys) != len(urls) {
+		return fmt.Errorf("incorrect number of arguments: keys: %d, urls: %d", len(keys), len(urls))
+	}
 	batch := &pgx.Batch{} // implicit BEGIN and COMMIT
 	for i := range keys {
 		// There's an upper limit for number of queries that can be bundled in single batch,

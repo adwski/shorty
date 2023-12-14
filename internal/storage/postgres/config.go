@@ -22,10 +22,9 @@ const (
 )
 
 type Config struct {
-	Logger                       *zap.Logger
-	DSN                          string
-	Migrate                      bool
-	EnforceDisableSSLOnMigration bool
+	Logger  *zap.Logger
+	DSN     string
+	Migrate bool
 }
 
 func New(cfg *Config) (*Postgres, error) {
@@ -55,10 +54,9 @@ func New(cfg *Config) (*Postgres, error) {
 	pCfg.HealthCheckPeriod = defaultHealthCheckPeriod
 
 	return &Postgres{
-		config:          pCfg,
-		log:             cfg.Logger,
-		dsn:             cfg.DSN,
-		doMigration:     cfg.Migrate,
-		migrationSSLOff: cfg.EnforceDisableSSLOnMigration,
+		config:      pCfg,
+		log:         cfg.Logger,
+		dsn:         cfg.DSN,
+		doMigration: cfg.Migrate,
 	}, nil
 }

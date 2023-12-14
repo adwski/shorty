@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/generators"
+
 	"github.com/adwski/shorty/internal/validate"
 	"go.uber.org/zap"
 )
@@ -101,9 +103,7 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 	)
 
 	for i := range batch {
-		if keys[i], err = svc.genUniqueHash(ctx); err != nil {
-			return nil, err
-		}
+		keys[i] = generators.RandString(svc.pathLength)
 		urls[i] = batch[i].URL
 	}
 
@@ -111,7 +111,7 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 		zap.Int("length", len(batch)))
 
 	if err = svc.store.StoreBatch(ctx, keys, urls); err != nil {
-		return nil, fmt.Errorf("storage error: %w", err)
+		return nil, fmt.Errorf("cannot store batch: %w", err)
 	}
 
 	result := make([]BatchShortened, 0, len(batch))

@@ -26,7 +26,7 @@ shortenertest: build
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \
-                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty' || exit 1 ; \
+                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty?sslmode=disable' || exit 1 ; \
 	done
 
 .PHONY: statictest
