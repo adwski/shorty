@@ -18,6 +18,7 @@ type Postgres struct {
 	pool        *pgxpool.Pool
 	config      *pgxpool.Config
 	log         *zap.Logger
+	tracers     map[uint32]*tracer
 	dsn         string
 	doMigration bool
 }
@@ -55,6 +56,7 @@ func (pg *Postgres) Store(ctx context.Context, hash, url string, overwrite bool)
 	if overwrite {
 		query += ` ON CONFLICT (hash) DO UPDATE url = $2 where hash = $1`
 	}
+
 	tag, err := pg.pool.Exec(ctx, query, hash, url)
 	if err == nil {
 		if tag.RowsAffected() != 1 {
@@ -85,6 +87,7 @@ func (pg *Postgres) StoreBatch(ctx context.Context, keys []string, urls []string
 		// https://youtu.be/sXMSWhcHCf8?t=33m55s
 		batch.Queue(`insert into urls(hash, orig) values ($1, $2)`, keys[i], urls[i])
 	}
+
 	if err := pg.pool.SendBatch(ctx, batch).Close(); err != nil {
 		return fmt.Errorf("pgx batch error: %w", err)
 	}

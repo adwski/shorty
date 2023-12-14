@@ -42,6 +42,7 @@ func New() (*Shorty, error) {
 		databaseDSN     = flag.String("d", "", "postgres connection DSN")
 		redirectScheme  = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
 		logLevel        = flag.String("log_level", "debug", "log level")
+		traceDB         = flag.Bool("trace_db", true, "print db wire protocol traces")
 		trustRequestID  = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
@@ -82,7 +83,7 @@ func New() (*Shorty, error) {
 	//--------------------------------------------------
 	// Init storage
 	//--------------------------------------------------
-	storage, err := initStorage(logger, databaseDSN, fileStoragePath)
+	storage, err := initStorage(logger, databaseDSN, fileStoragePath, traceDB)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +114,7 @@ func envOverride(name string, param *string) {
 func initStorage(
 	logger *zap.Logger,
 	databaseDSN, fileStoragePath *string,
+	traceDB *bool,
 ) (storage Storage, err error) {
 	switch {
 	case *databaseDSN != "":
@@ -120,6 +122,7 @@ func initStorage(
 			Logger:  logger,
 			DSN:     *databaseDSN,
 			Migrate: true,
+			Trace:   *traceDB,
 		}); err != nil {
 			return nil, fmt.Errorf("cannot initialize postgres storage: %w", err)
 		}

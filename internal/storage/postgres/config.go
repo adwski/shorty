@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,6 +27,7 @@ type Config struct {
 	Logger  *zap.Logger
 	DSN     string
 	Migrate bool
+	Trace   bool
 }
 
 func New(cfg *Config) (*Postgres, error) {
@@ -53,10 +56,43 @@ func New(cfg *Config) (*Postgres, error) {
 	pCfg.MinConns = defaultMinConns
 	pCfg.HealthCheckPeriod = defaultHealthCheckPeriod
 
+	var tracers map[uint32]*tracer
+	if cfg.Trace {
+		tracers = make(map[uint32]*tracer)
+		pCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+			pid := conn.PgConn().PID()
+			tracers[pid] = newTracer(cfg.Logger, pid)
+			conn.PgConn().Frontend().Trace(tracers[pid], pgproto3.TracerOptions{
+				SuppressTimestamps: true,
+				RegressMode:        true,
+			})
+			return nil
+		}
+	}
+
 	return &Postgres{
 		config:      pCfg,
 		log:         cfg.Logger,
 		dsn:         cfg.DSN,
 		doMigration: cfg.Migrate,
+		tracers:     tracers,
 	}, nil
+}
+
+type tracer struct {
+	log *zap.Logger
+}
+
+func newTracer(l *zap.Logger, pid uint32) *tracer {
+	t := &tracer{
+		log: l.With(zap.Uint32("pid", pid)),
+	}
+	t.log.Debug("spawning pgx tracer")
+	return t
+}
+
+func (t *tracer) Write(b []byte) (int, error) {
+	t.log.Debug("db trace",
+		zap.String("trace", string(b)))
+	return len(b), nil
 }
