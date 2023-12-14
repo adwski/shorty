@@ -18,7 +18,6 @@ type Postgres struct {
 	pool        *pgxpool.Pool
 	config      *pgxpool.Config
 	log         *zap.Logger
-	tracers     map[uint32]*tracer
 	dsn         string
 	doMigration bool
 }

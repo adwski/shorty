@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgproto3"
+	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 
 	"github.com/jackc/pgx/v5"
 
@@ -56,18 +59,8 @@ func New(cfg *Config) (*Postgres, error) {
 	pCfg.MinConns = defaultMinConns
 	pCfg.HealthCheckPeriod = defaultHealthCheckPeriod
 
-	var tracers map[uint32]*tracer
 	if cfg.Trace {
-		tracers = make(map[uint32]*tracer)
-		pCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-			pid := conn.PgConn().PID()
-			tracers[pid] = newTracer(cfg.Logger, pid)
-			conn.PgConn().Frontend().Trace(tracers[pid], pgproto3.TracerOptions{
-				SuppressTimestamps: true,
-				RegressMode:        true,
-			})
-			return nil
-		}
+		pCfg.AfterConnect = createTracers(cfg.Logger)
 	}
 
 	return &Postgres{
@@ -75,8 +68,29 @@ func New(cfg *Config) (*Postgres, error) {
 		log:         cfg.Logger,
 		dsn:         cfg.DSN,
 		doMigration: cfg.Migrate,
-		tracers:     tracers,
 	}, nil
+}
+
+func createTracers(log *zap.Logger) func(ctx context.Context, conn *pgx.Conn) error {
+	tracers := &sync.Map{}
+	return func(ctx context.Context, conn *pgx.Conn) error {
+		// Spawn tracer
+		pid := conn.PgConn().PID()
+		tr := newTracer(log, pid)
+		tracers.Store(pid, tr)
+		conn.PgConn().Frontend().Trace(tr, pgproto3.TracerOptions{
+			SuppressTimestamps: true,
+			RegressMode:        true,
+		})
+
+		// Cleanup
+		go func(pgConn *pgconn.PgConn, pid uint32) {
+			<-pgConn.CleanupDone()
+			tracers.Delete(pid)
+			log.Debug("tracer stopped", zap.Uint32("pid", pid))
+		}(conn.PgConn(), pid)
+		return nil
+	}
 }
 
 type tracer struct {
