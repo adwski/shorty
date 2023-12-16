@@ -8,7 +8,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
-type DB map[string]URLRecord
+type DB map[string]Record
 
 func NewDB() DB {
 	return make(DB)
@@ -22,14 +22,14 @@ func (db DB) Map() map[string]string {
 	return kv
 }
 
-type URLRecord struct {
+type Record struct {
 	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
 
-func NewURLRecordFromBytes(data []byte) (*URLRecord, error) {
-	record := &URLRecord{}
+func NewURLRecordFromBytes(data []byte) (*Record, error) {
+	record := &Record{}
 	if err := json.Unmarshal(data, &record); err != nil {
 		return nil, fmt.Errorf("malformed json data: %w", err)
 	}

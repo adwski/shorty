@@ -14,21 +14,17 @@ import (
 )
 
 func TestNewSimple(t *testing.T) {
-	type args struct {
-		key string
-		url string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		args    *storage.URL
 		si      *Memory
 		wantErr bool
 	}{
 		{
 			name: "store and get",
-			args: args{
-				key: "aaa",
-				url: "https://bbb.ccc",
+			args: &storage.URL{
+				Short: "aaa",
+				Orig:  "https://bbb.ccc",
 			},
 			si: New(),
 		},
@@ -36,16 +32,16 @@ func TestNewSimple(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			_, err := tt.si.Store(ctx, tt.args.key, tt.args.url, false)
+			_, err := tt.si.Store(ctx, tt.args, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 
-			url, err2 := tt.si.Get(ctx, tt.args.key)
+			url, err2 := tt.si.Get(ctx, tt.args.Short)
 			require.NoError(t, err2)
-			assert.Equal(t, tt.args.url, url)
+			assert.Equal(t, tt.args.Orig, url)
 		})
 	}
 }
@@ -53,8 +49,7 @@ func TestNewSimple(t *testing.T) {
 func TestNewSimple_Get(t *testing.T) {
 	type args struct {
 		db  map[string]string
-		key string
-		url string
+		url *storage.URL
 	}
 	tests := []struct {
 		name string
@@ -64,17 +59,21 @@ func TestNewSimple_Get(t *testing.T) {
 		{
 			name: "get existing",
 			args: args{
-				db:  map[string]string{"aaa": "https://bbb.ccc"},
-				key: "aaa",
-				url: "https://bbb.ccc",
+				db: map[string]string{"aaa": "https://bbb.ccc"},
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 			},
 		},
 		{
 			name: "get not existing",
 			args: args{
-				db:  map[string]string{},
-				key: "aaa",
-				url: "https://bbb.ccc",
+				db: map[string]string{},
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 			},
 			err: storage.ErrNotFound,
 		},
@@ -82,7 +81,7 @@ func TestNewSimple_Get(t *testing.T) {
 	for _, tt := range tests {
 		store := db.NewDB()
 		for k, v := range tt.args.db {
-			store[k] = db.URLRecord{OriginalURL: v}
+			store[k] = db.Record{OriginalURL: v}
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,10 +90,10 @@ func TestNewSimple_Get(t *testing.T) {
 				mux: &sync.Mutex{},
 			}
 
-			url, err := si.Get(context.Background(), tt.args.key)
+			url, err := si.Get(context.Background(), tt.args.url.Short)
 			if tt.err == nil {
 				require.NoError(t, err)
-				assert.Equal(t, tt.args.url, url)
+				assert.Equal(t, tt.args.url.Orig, url)
 			} else {
 				assert.Equal(t, tt.err, err)
 			}
@@ -104,8 +103,7 @@ func TestNewSimple_Get(t *testing.T) {
 
 func TestNewSimple_Store(t *testing.T) {
 	type args struct {
-		key       string
-		url       string
+		url       *storage.URL
 		beforeDB  map[string]string
 		wantDB    map[string]string
 		wantErr   error
@@ -118,8 +116,10 @@ func TestNewSimple_Store(t *testing.T) {
 		{
 			name: "store existing with overwrite",
 			args: args{
-				key:       "aaa",
-				url:       "https://ddd.eee",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://ddd.eee",
+				},
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://ddd.eee"},
 				overwrite: true,
@@ -128,8 +128,10 @@ func TestNewSimple_Store(t *testing.T) {
 		{
 			name: "store existing without overwrite",
 			args: args{
-				key:       "aaa",
-				url:       "https://ddd.eee",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://ddd.eee",
+				},
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
 				wantErr:   storage.ErrAlreadyExists,
@@ -139,8 +141,10 @@ func TestNewSimple_Store(t *testing.T) {
 		{
 			name: "store not existing",
 			args: args{
-				key:       "aaa",
-				url:       "https://bbb.ccc",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 				beforeDB:  map[string]string{},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
 				overwrite: false,
@@ -151,12 +155,12 @@ func TestNewSimple_Store(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := db.NewDB()
 			for k, v := range tt.args.beforeDB {
-				store[k] = db.URLRecord{OriginalURL: v}
+				store[k] = db.Record{OriginalURL: v}
 			}
 			si := New()
 			si.DB = store
 
-			_, err := si.Store(context.Background(), tt.args.key, tt.args.url, tt.args.overwrite)
+			_, err := si.Store(context.Background(), tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)

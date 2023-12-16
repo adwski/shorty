@@ -1,4 +1,4 @@
-package postgres
+package database
 
 import (
 	"embed"
@@ -10,19 +10,19 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-func (pg *Postgres) migrate() error {
-	if !pg.doMigration {
+func (db *Database) migrate() error {
+	if !db.doMigration {
 		return nil
 	}
-	pg.log.Debug("starting migration")
-	change, err := runMigrations(pg.dsn)
+	db.log.Debug("starting migration")
+	change, err := runMigrations(db.dsn)
 	if err != nil {
 		return err
 	}
 	if change {
-		pg.log.Info("migration is complete")
+		db.log.Info("migration is complete")
 	} else {
-		pg.log.Debug("db is up to date")
+		db.log.Debug("db is up to date")
 	}
 	return nil
 }
@@ -45,7 +45,7 @@ func runMigrations(dsn string) (bool, error) {
 		if !errors.Is(err, migrate.ErrNoChange) {
 			return false, fmt.Errorf("failed to apply migrations to the DB: %w", err)
 		}
-		return true, nil
+		return false, nil
 	}
-	return false, nil
+	return true, nil
 }

@@ -1,4 +1,4 @@
-package postgres
+package database
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 
 	"github.com/jackc/pgx/v5"
@@ -33,7 +32,7 @@ type Config struct {
 	Trace   bool
 }
 
-func New(cfg *Config) (*Postgres, error) {
+func New(ctx context.Context, cfg *Config) (*Database, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
 	}
@@ -42,7 +41,27 @@ func New(cfg *Config) (*Postgres, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse DSN: %w", err)
 	}
+	preparePoolConfig(pCfg)
+	if cfg.Trace {
+		t := newTracers(cfg.Logger)
+		pCfg.AfterConnect = t.create()
+		pCfg.BeforeClose = t.destroy()
+	}
 
+	db := &Database{
+		config:      pCfg,
+		log:         cfg.Logger,
+		dsn:         cfg.DSN,
+		doMigration: cfg.Migrate,
+	}
+
+	if err = db.init(ctx); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func preparePoolConfig(pCfg *pgxpool.Config) {
 	pCfg.ConnConfig.Config.ConnectTimeout = defaultConnectTimeout
 
 	// Choosing this mode because:
@@ -58,37 +77,53 @@ func New(cfg *Config) (*Postgres, error) {
 	pCfg.MaxConns = defaultMaxConns
 	pCfg.MinConns = defaultMinConns
 	pCfg.HealthCheckPeriod = defaultHealthCheckPeriod
-
-	if cfg.Trace {
-		pCfg.AfterConnect = createTracers(cfg.Logger)
-	}
-
-	return &Postgres{
-		config:      pCfg,
-		log:         cfg.Logger,
-		dsn:         cfg.DSN,
-		doMigration: cfg.Migrate,
-	}, nil
 }
 
-func createTracers(log *zap.Logger) func(ctx context.Context, conn *pgx.Conn) error {
-	tracers := &sync.Map{}
+func (db *Database) init(ctx context.Context) error {
+	if err := db.migrate(); err != nil {
+		return err
+	}
+
+	var err error
+	db.pool, err = pgxpool.NewWithConfig(ctx, db.config)
+	if err != nil {
+		return fmt.Errorf("cannot create pgx connection pool: %w", err)
+	}
+	return nil
+}
+
+type tracers struct {
+	*sync.Map
+	l *zap.Logger
+}
+
+func newTracers(logger *zap.Logger) *tracers {
+	return &tracers{
+		Map: &sync.Map{},
+		l:   logger,
+	}
+}
+
+func (t *tracers) destroy() func(conn *pgx.Conn) {
+	return func(conn *pgx.Conn) {
+		// Cleanup
+		pid := conn.PgConn().PID()
+		t.Delete(pid)
+		t.l.Debug("pgx tracer destroyed", zap.Uint32("pid", pid))
+	}
+}
+
+func (t *tracers) create() func(ctx context.Context, conn *pgx.Conn) error {
 	return func(ctx context.Context, conn *pgx.Conn) error {
 		// Spawn tracer
 		pid := conn.PgConn().PID()
-		tr := newTracer(log, pid)
-		tracers.Store(pid, tr)
+		t.l.Debug("spawning pgx tracer")
+		tr := newTracer(t.l, pid)
+		t.Store(pid, tr)
 		conn.PgConn().Frontend().Trace(tr, pgproto3.TracerOptions{
 			SuppressTimestamps: true,
 			RegressMode:        true,
 		})
-
-		// Cleanup
-		go func(pgConn *pgconn.PgConn, pid uint32) {
-			<-pgConn.CleanupDone()
-			tracers.Delete(pid)
-			log.Debug("tracer stopped", zap.Uint32("pid", pid))
-		}(conn.PgConn(), pid)
 		return nil
 	}
 }
@@ -98,11 +133,9 @@ type tracer struct {
 }
 
 func newTracer(l *zap.Logger, pid uint32) *tracer {
-	t := &tracer{
+	return &tracer{
 		log: l.With(zap.Uint32("pid", pid)),
 	}
-	t.log.Debug("spawning pgx tracer")
-	return t
 }
 
 func (t *tracer) Write(b []byte) (int, error) {

@@ -1,6 +1,6 @@
 BEGIN TRANSACTION;
 
-DROP INDEX url_hash;
+DROP INDEX urls_hash;
 DROP TABLE urls;
 
 COMMIT;

@@ -9,7 +9,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/adwski/shorty/internal/app/config/mockconfig"
+	"github.com/adwski/shorty/internal/app/mockapp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -50,14 +51,10 @@ func TestService_ShortenBatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Prepare storage
-			st := mockconfig.NewStorage(t)
+			st := mockapp.NewStorage(t)
 
 			// Prepare mock calls
-			var urls []string
-			for _, u := range tt.args.batch {
-				urls = append(urls, u.URL)
-			}
-			st.EXPECT().StoreBatch(mock.Anything, mock.Anything, urls).Return(nil)
+			st.EXPECT().StoreBatch(mock.Anything, mock.Anything).Once().Return(nil)
 
 			// Init service
 			svc := New(&Config{

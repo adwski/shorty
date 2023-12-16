@@ -22,8 +22,8 @@ const (
 
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
-	Store(ctx context.Context, key string, url string, overwrite bool) (string, error)
-	StoreBatch(ctx context.Context, keys []string, urls []string) error
+	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
+	StoreBatch(ctx context.Context, urls []storage.URL) error
 }
 
 // Service implements http handler for shortened urls management.
@@ -50,7 +50,10 @@ func (svc *Service) storeURL(ctx context.Context, u string) (path string, err er
 			zap.String("url", u))
 
 		var storedPath string
-		if storedPath, err = svc.store.Store(ctx, path, u, false); err != nil {
+		if storedPath, err = svc.store.Store(ctx, &storage.URL{
+			Short: path,
+			Orig:  u,
+		}, false); err != nil {
 			if errors.Is(err, storage.ErrConflict) {
 				path = storedPath
 				return

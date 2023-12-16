@@ -29,6 +29,8 @@ func New() *Memory {
 	}
 }
 
+func (m *Memory) Close() {}
+
 func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -39,44 +41,43 @@ func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	return record.OriginalURL, nil
 }
 
-func (m *Memory) Store(_ context.Context, key string, url string, overwrite bool) (string, error) {
+func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if _, ok := m.DB[key]; ok && !overwrite {
+	if _, ok := m.DB[url.Short]; ok && !overwrite {
 		return "", storage.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()
 	if err != nil {
 		return "", fmt.Errorf("cannot generate key uuid: %w", err)
 	}
-	m.DB[key] = db.URLRecord{
+	m.DB[url.Short] = db.Record{
 		UUID:        u.String(),
-		ShortURL:    key,
-		OriginalURL: url,
+		ShortURL:    url.Short,
+		OriginalURL: url.Orig,
 	}
 	return "", nil
 }
 
-func (m *Memory) StoreBatch(_ context.Context, keys []string, urls []string) error {
-	if len(keys) != len(urls) {
-		return fmt.Errorf("incorrect number of arguments: keys: %d, urls: %d", len(keys), len(urls))
-	}
+func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	for i := range keys {
-		if _, ok := m.DB[keys[i]]; ok {
+	IDs := make([]string, len(urls))
+	for i, url := range urls {
+		if _, ok := m.DB[url.Short]; ok {
 			return storage.ErrAlreadyExists
 		}
-	}
-	for i := range keys {
 		u, err := m.gen.NewV4()
 		if err != nil {
 			return fmt.Errorf("cannot generate key uuid: %w", err)
 		}
-		m.DB[keys[i]] = db.URLRecord{
-			UUID:        u.String(),
-			ShortURL:    keys[i],
-			OriginalURL: urls[i],
+		IDs[i] = u.String()
+	}
+	for i, url := range urls {
+		m.DB[url.Short] = db.Record{
+			UUID:        IDs[i],
+			ShortURL:    url.Short,
+			OriginalURL: url.Orig,
 		}
 	}
 	return nil

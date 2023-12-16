@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/adwski/shorty/internal/app/config/mockconfig"
+	"github.com/adwski/shorty/internal/app/mockapp"
 
 	"github.com/adwski/shorty/internal/storage"
 
@@ -99,7 +99,7 @@ func TestService_Redirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := mockconfig.NewStorage(t)
+			st := mockapp.NewStorage(t)
 			ctx := context.Background()
 
 			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {

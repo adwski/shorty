@@ -9,7 +9,7 @@ import (
 	"net/url"
 
 	"github.com/adwski/shorty/internal/generators"
-
+	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
 	"go.uber.org/zap"
 )
@@ -98,19 +98,18 @@ func getURLBatchFromJSONBody(req *http.Request) (batchReq []BatchURL, err error)
 func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]BatchShortened, error) {
 	var (
 		err  error
-		keys = make([]string, len(batch))
-		urls = make([]string, len(batch))
+		urls = make([]storage.URL, len(batch))
 	)
 
 	for i := range batch {
-		keys[i] = generators.RandString(svc.pathLength)
-		urls[i] = batch[i].URL
+		urls[i].Short = generators.RandString(svc.pathLength)
+		urls[i].Orig = batch[i].URL
 	}
 
 	svc.log.Debug("sending batch to storage",
 		zap.Int("length", len(batch)))
 
-	if err = svc.store.StoreBatch(ctx, keys, urls); err != nil {
+	if err = svc.store.StoreBatch(ctx, urls); err != nil {
 		return nil, fmt.Errorf("cannot store batch: %w", err)
 	}
 
@@ -118,7 +117,7 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 	for i := range batch {
 		result = append(result, BatchShortened{
 			ID:    batch[i].ID,
-			Short: svc.getServedURL(keys[i]),
+			Short: svc.getServedURL(urls[i].Short),
 		})
 	}
 

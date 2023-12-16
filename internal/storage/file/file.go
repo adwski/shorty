@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
+
+	"github.com/adwski/shorty/internal/storage"
 
 	"github.com/adwski/shorty/internal/storage/memory"
 	"github.com/adwski/shorty/internal/storage/memory/db"
@@ -33,6 +34,7 @@ const (
 type File struct {
 	*memory.Memory
 	log      *zap.Logger
+	done     chan struct{}
 	filePath string
 	changed  bool
 	shutdown bool
@@ -43,7 +45,7 @@ type Config struct {
 	FilePath string
 }
 
-func New(cfg *Config) (*File, error) {
+func New(ctx context.Context, cfg *Config) (*File, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
 	}
@@ -66,38 +68,40 @@ func New(cfg *Config) (*File, error) {
 			zap.String("path", cfg.FilePath))
 	}
 
-	return &File{
+	s := &File{
 		Memory:   st,
 		log:      cfg.Logger,
 		filePath: cfg.FilePath,
-	}, nil
+		done:     make(chan struct{}),
+	}
+	go s.maintainPersistence(ctx)
+	return s, nil
 }
 
-func (s *File) Store(ctx context.Context, key string, url string, overwrite bool) (string, error) {
+func (s *File) Close() {
+	<-s.done
+}
+
+func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
 	if s.shutdown {
 		return "", errors.New("storage is shutting down")
 	}
-	if _, err := s.Memory.Store(ctx, key, url, overwrite); err != nil {
+	if _, err := s.Memory.Store(ctx, url, overwrite); err != nil {
 		return "", fmt.Errorf("cannot store url: %w", err)
 	}
 	s.changed = true
 	return "", nil
 }
 
-func (s *File) StoreBatch(ctx context.Context, keys []string, urls []string) error {
+func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	if s.shutdown {
 		return errors.New("storage is shutting down")
 	}
-	if err := s.Memory.StoreBatch(ctx, keys, urls); err != nil {
+	if err := s.Memory.StoreBatch(ctx, urls); err != nil {
 		return fmt.Errorf("cannot store url: %w", err)
 	}
 	s.changed = true
 	return nil
-}
-
-func (s *File) Run(ctx context.Context, wg *sync.WaitGroup) {
-	s.maintainPersistence(ctx)
-	wg.Done()
 }
 
 func (s *File) maintainPersistence(ctx context.Context) {
@@ -112,6 +116,7 @@ Loop:
 			s.persist()
 		}
 	}
+	close(s.done)
 }
 
 func (s *File) persist() {
@@ -159,7 +164,7 @@ func readURLsFromFile(filePath string) (db.DB, error) {
 	r := bufio.NewReaderSize(f, fileBufferSize)
 
 	var (
-		record *db.URLRecord
+		record *db.Record
 		urlDB  = db.NewDB()
 	)
 
@@ -175,14 +180,14 @@ func readURLsFromFile(filePath string) (db.DB, error) {
 	return urlDB, nil
 }
 
-func readURLFromLine(r *bufio.Reader) (*db.URLRecord, error) {
+func readURLFromLine(r *bufio.Reader) (*db.Record, error) {
 	data, err := r.ReadBytes('\n')
 	if err != nil {
 		if !errors.Is(err, io.EOF) || len(data) == 0 {
 			return nil, fmt.Errorf("error while reading url from filestore: %w", err)
 		}
 	}
-	var record *db.URLRecord
+	var record *db.Record
 	if record, err = db.NewURLRecordFromBytes(data[:len(data)-1]); err != nil {
 		return nil, fmt.Errorf("cannot parse url record: %w", err)
 	}

@@ -7,3 +7,8 @@ var (
 	ErrAlreadyExists = errors.New("already exists")
 	ErrConflict      = errors.New("conflict")
 )
+
+type URL struct {
+	Short string
+	Orig  string
+}

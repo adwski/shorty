@@ -8,6 +8,6 @@ CREATE TABLE urls (
     CONSTRAINT orig_not_empty CHECK (orig != '')
 );
 
-CREATE INDEX url_hash On urls (hash);
+CREATE UNIQUE INDEX urls_hash On urls (hash);
 
 COMMIT;
