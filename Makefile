@@ -48,9 +48,9 @@ test: mock goimports lint unittests statictest shortenertest
 integration-tests: docker-dev
 	go test ./... -v -count=1 -cover --tags=integration -run=TestDatabase*
 
-.PHONY: image-prod
+.PHONY: image-release
 image-release:
-	docker build -t shorty:prod --target release -f docker/Dockerfile .
+	docker build -t shorty:release --target release -f docker/Dockerfile .
 
 .PHONY: image-dev
 image-dev:
