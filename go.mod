@@ -6,10 +6,8 @@ require (
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/gofrs/uuid/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/golang/mock v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.5.1
-	github.com/milqa/pgxpoolmock v0.0.1
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
 )
@@ -23,6 +21,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/stretchr/objx v0.5.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
