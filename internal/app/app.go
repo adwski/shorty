@@ -87,7 +87,8 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 func bindServices(router *chi.Mux,
 	shortenerSvc *shortener.Service,
 	resolverSvc *resolver.Service,
-	statusSvc *status.Service) {
+	statusSvc *status.Service,
+) {
 	router.Post("/", shortenerSvc.ShortenPlain)
 	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
 	router.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)

@@ -61,6 +61,9 @@ func TestShorty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("Storing and getting "+tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+
 			st := mockapp.NewStorage(t)
 			st.On("Store", mock.Anything, mock.Anything, false).Return(
 				func(_ context.Context, url *storage.URL, _ bool) (string, error) {
@@ -73,7 +76,7 @@ func TestShorty(t *testing.T) {
 				Host:         "xxx.yyy",
 				ServedScheme: "http",
 			}
-			shorty := NewShorty(zap.NewExample(), st, cfg)
+			shorty := NewShorty(logger, st, cfg)
 
 			//-----------------------------------------------------
 			// Store URL

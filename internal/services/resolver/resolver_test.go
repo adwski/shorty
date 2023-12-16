@@ -99,6 +99,9 @@ func TestService_Redirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+
 			st := mockapp.NewStorage(t)
 			ctx := context.Background()
 
@@ -112,7 +115,7 @@ func TestService_Redirect(t *testing.T) {
 
 			svc := &Service{
 				store: st,
-				log:   zap.NewExample(),
+				log:   logger,
 			}
 
 			r := httptest.NewRequest(http.MethodGet, "/"+tt.args.shortURL, nil)

@@ -35,11 +35,13 @@ func TestFileStore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			storeFile := "/tmp/testFile" + strconv.Itoa(int(time.Now().Unix()))
 			fs, err := New(ctx, &Config{
 				FilePath: storeFile,
-				Logger:   zap.NewExample(),
+				Logger:   logger,
 			})
 			require.NoError(t, err)
 

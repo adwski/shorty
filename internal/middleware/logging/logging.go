@@ -57,7 +57,7 @@ func (rw *rwWrapper) flushHeader() {
 		// WriteHeader was never called
 		rw.status = http.StatusOK
 	} else if rw.status < 100 || rw.status > 999 {
-		// Incorrect code
+		// Incorrect code, we're preventing panic on net/http level
 		rw.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		rw.writeErr = errors.New("incorrect response code")
 	}

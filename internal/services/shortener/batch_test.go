@@ -50,6 +50,8 @@ func TestService_ShortenBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
 			// Prepare storage
 			st := mockapp.NewStorage(t)
 
@@ -59,7 +61,7 @@ func TestService_ShortenBatch(t *testing.T) {
 			// Init service
 			svc := New(&Config{
 				Store:        st,
-				Logger:       zap.NewExample(),
+				Logger:       logger,
 				ServedScheme: tt.args.serveScheme,
 				Host:         tt.args.serveHost,
 				PathLength:   tt.args.pathLen,

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -15,28 +16,34 @@ import (
 )
 
 func main() {
-	logger := initLogger()
+	logger, lvlParseOk := initLogger()
 	defer func() {
 		if errLog := logger.Sync(); errLog != nil && !errors.Is(errLog, syscall.ENOTTY) {
 			log.Println("failed to sync zap logger", errLog)
 		}
 	}()
+	if !lvlParseOk {
+		defer os.Exit(1)
+		return
+	}
 
 	cfg, err := config.New()
 	if err != nil {
 		logger.Fatal("cannot configure app", zap.Error(err))
 	}
 
-	run(logger, cfg)
+	if err = run(logger, cfg); err != nil {
+		logger.Fatal("runtime error", zap.Error(err))
+	}
 }
 
-func run(logger *zap.Logger, cfg *config.Shorty) {
+func run(logger *zap.Logger, cfg *config.Shorty) error {
 	var (
 		ctx, cancel = signal.NotifyContext(context.Background(), os.Interrupt)
-		store, errS = initStorage(ctx, logger, cfg.StorageConfig)
+		store, err  = initStorage(ctx, logger, cfg.StorageConfig)
 	)
-	if errS != nil {
-		logger.Fatal("cannot configure storage", zap.Error(errS))
+	if err != nil {
+		return fmt.Errorf("cannot configure storage: %w", err)
 	}
 
 	var (
@@ -55,4 +62,5 @@ func run(logger *zap.Logger, cfg *config.Shorty) {
 	}
 	wg.Wait()
 	store.Close()
+	return nil
 }
