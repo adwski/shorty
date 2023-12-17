@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -21,76 +20,59 @@ import (
 )
 
 func TestFileStore(t *testing.T) {
-	type args struct {
-		key string
-		url string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		args    *storage.URL
 		wantErr bool
 	}{
 		{
 			name: "store and get",
-			args: args{
-				key: "aaa",
-				url: "https://bbb.ccc",
+			args: &storage.URL{
+				Short: "aaa",
+				Orig:  "https://bbb.ccc",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
 			storeFile := "/tmp/testFile" + strconv.Itoa(int(time.Now().Unix()))
-			fs, err := New(&Config{
+			fs, err := New(ctx, &Config{
 				FilePath: storeFile,
-				Logger:   zap.NewExample(),
+				Logger:   logger,
 			})
 			require.NoError(t, err)
 
-			// Run persistence
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			wg := &sync.WaitGroup{}
-			wg.Add(1)
-			go fs.Run(ctx, wg)
-
 			// store
-			err = fs.Store(tt.args.key, tt.args.url, false)
+			_, err = fs.Store(ctx, tt.args, false)
 			require.NoError(t, err)
 
 			// get
 			var url string
-			url, err = fs.Get(tt.args.key)
+			url, err = fs.Get(ctx, tt.args.Short)
 			require.NoError(t, err)
-			assert.Equal(t, tt.args.url, url)
+			assert.Equal(t, tt.args.Orig, url)
 
 			// stop persistence
-			done := make(chan struct{})
-			go func() {
-				wg.Wait()
-				done <- struct{}{}
-			}()
 			cancel()
-			select {
-			case <-done:
-			case <-time.After(5 * time.Second):
-				t.Fatal("file storage did not shutdown in time")
-			}
+			fs.Close()
 
 			// check persistence
 			var (
 				content []byte
-				urlRec  db.URLRecord
+				rec     db.Record
 			)
 			content, err = os.ReadFile(storeFile)
 			require.NoError(t, err)
 			require.NotEmpty(t, content)
-			err = json.Unmarshal(content, &urlRec)
+			err = json.Unmarshal(content, &rec)
 			require.NoError(t, err)
-			_, err = uuid.FromString(urlRec.UUID)
+			_, err = uuid.FromString(rec.UUID)
 			require.NoError(t, err)
-			assert.Equal(t, tt.args.key, urlRec.ShortURL)
-			assert.Equal(t, tt.args.url, urlRec.OriginalURL)
+			assert.Equal(t, tt.args.Short, rec.ShortURL)
+			assert.Equal(t, tt.args.Orig, rec.OriginalURL)
 		})
 	}
 }
@@ -98,8 +80,7 @@ func TestFileStore(t *testing.T) {
 func TestStore_Get(t *testing.T) {
 	type args struct {
 		db  map[string]string
-		key string
-		url string
+		url *storage.URL
 	}
 	tests := []struct {
 		name string
@@ -109,17 +90,21 @@ func TestStore_Get(t *testing.T) {
 		{
 			name: "get existing",
 			args: args{
-				db:  map[string]string{"aaa": "https://bbb.ccc"},
-				key: "aaa",
-				url: "https://bbb.ccc",
+				db: map[string]string{"aaa": "https://bbb.ccc"},
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 			},
 		},
 		{
 			name: "get not existing",
 			args: args{
-				db:  map[string]string{},
-				key: "aaa",
-				url: "https://bbb.ccc",
+				db: map[string]string{},
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 			},
 			err: storage.ErrNotFound,
 		},
@@ -130,17 +115,17 @@ func TestStore_Get(t *testing.T) {
 				Memory: memory.New(),
 			}
 			for k, v := range tt.args.db {
-				fs.Memory.DB[k] = db.URLRecord{
+				fs.Memory.DB[k] = db.Record{
 					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,
 				}
 			}
 
-			url, err := fs.Get(tt.args.key)
+			url, err := fs.Get(context.Background(), tt.args.url.Short)
 			if tt.err == nil {
 				require.NoError(t, err)
-				assert.Equal(t, tt.args.url, url)
+				assert.Equal(t, tt.args.url.Orig, url)
 			} else {
 				assert.Equal(t, tt.err, err)
 			}
@@ -150,8 +135,7 @@ func TestStore_Get(t *testing.T) {
 
 func TestStore_Store(t *testing.T) {
 	type args struct {
-		key       string
-		url       string
+		url       *storage.URL
 		beforeDB  map[string]string
 		wantDB    map[string]string
 		wantErr   error
@@ -164,8 +148,10 @@ func TestStore_Store(t *testing.T) {
 		{
 			name: "store existing with overwrite",
 			args: args{
-				key:       "aaa",
-				url:       "https://ddd.eee",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://ddd.eee",
+				},
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://ddd.eee"},
 				overwrite: true,
@@ -174,8 +160,10 @@ func TestStore_Store(t *testing.T) {
 		{
 			name: "store existing without overwrite",
 			args: args{
-				key:       "aaa",
-				url:       "https://ddd.eee",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://ddd.eee",
+				},
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
 				wantErr:   storage.ErrAlreadyExists,
@@ -185,8 +173,10 @@ func TestStore_Store(t *testing.T) {
 		{
 			name: "store not existing",
 			args: args{
-				key:       "aaa",
-				url:       "https://bbb.ccc",
+				url: &storage.URL{
+					Short: "aaa",
+					Orig:  "https://bbb.ccc",
+				},
 				beforeDB:  map[string]string{},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
 				overwrite: false,
@@ -199,14 +189,14 @@ func TestStore_Store(t *testing.T) {
 				Memory: memory.New(),
 			}
 			for k, v := range tt.args.beforeDB {
-				fs.Memory.DB[k] = db.URLRecord{
+				fs.Memory.DB[k] = db.Record{
 					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,
 				}
 			}
 
-			err := fs.Store(tt.args.key, tt.args.url, tt.args.overwrite)
+			_, err := fs.Store(context.Background(), tt.args.url, tt.args.overwrite)
 
 			if tt.args.wantErr != nil {
 				require.NotNil(t, err)

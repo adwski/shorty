@@ -6,6 +6,6 @@ filename: "mock_{{.InterfaceName|lower}}.go"
 outpkg: "mock{{.PackageName}}"
 dir: "{{.InterfaceDir}}/mock{{.PackageName}}"
 packages:
-  github.com/adwski/shorty/internal/app/config:
+  github.com/adwski/shorty/internal/app:
     interfaces:
       Storage: {}

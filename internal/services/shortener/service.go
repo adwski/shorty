@@ -3,6 +3,7 @@ package shortener
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,17 +11,19 @@ import (
 	"net/url"
 
 	"github.com/adwski/shorty/internal/generators"
+
 	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultMaxTries = 10
+	defaultStoreRetries = 3
 )
 
 type Storage interface {
-	Get(key string) (url string, err error)
-	Store(key string, url string, overwrite bool) error
+	Get(ctx context.Context, key string) (url string, err error)
+	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
+	StoreBatch(ctx context.Context, urls []storage.URL) error
 }
 
 // Service implements http handler for shortened urls management.
@@ -37,21 +40,29 @@ func (svc *Service) getServedURL(shortPath string) string {
 	return fmt.Sprintf("%s://%s/%s", svc.servedScheme, svc.host, shortPath)
 }
 
-func (svc *Service) storeURL(u string) (path string, err error) {
-	for try := 0; try <= defaultMaxTries; try++ {
-		if try == defaultMaxTries {
-			err = errors.New("given up creating redirect")
-			return
-		}
+func (svc *Service) storeURL(ctx context.Context, u string) (path string, err error) {
+	for i := 1; i <= defaultStoreRetries; i++ {
 		path = generators.RandString(svc.pathLength)
-		if err = svc.store.Store(path, u, false); err != nil {
-			if errors.Is(err, storage.ErrAlreadyExists) {
-				continue
+
+		svc.log.Debug("storing url",
+			zap.String("key", path),
+			zap.Int("try", i),
+			zap.String("url", u))
+
+		var storedPath string
+		if storedPath, err = svc.store.Store(ctx, &storage.URL{
+			Short: path,
+			Orig:  u,
+		}, false); err != nil {
+			if errors.Is(err, storage.ErrConflict) {
+				path = storedPath
+				return
 			}
-			return
+			continue
 		}
-		break
+		return
 	}
+	err = fmt.Errorf("cannot store url: %w", err)
 	return
 }
 

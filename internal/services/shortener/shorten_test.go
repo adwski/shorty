@@ -2,6 +2,7 @@ package shortener
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,7 +11,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/app/config/mockconfig"
+	"github.com/adwski/shorty/internal/storage"
+
+	"github.com/adwski/shorty/internal/app/mockapp"
 
 	"github.com/stretchr/testify/mock"
 
@@ -128,14 +131,19 @@ func TestService_Shorten(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
 			// Prepare storage
-			st := mockconfig.NewStorage(t)
+			st := mockapp.NewStorage(t)
+			ctx := context.Background()
 
 			if !tt.args.invalid {
+				t.Log("registering mock expect")
 				st.On("Store", mock.Anything, mock.Anything, false).Return(
-					func(key, val string, _ bool) error {
-						st.EXPECT().Get(key).Return(val, nil)
-						return nil
+					func(_ context.Context, url *storage.URL, _ bool) (string, error) {
+						t.Log("registering mock get", url)
+						st.EXPECT().Get(ctx, url.Short).Return(url.Orig, nil)
+						return "", nil
 					})
 			}
 
@@ -146,7 +154,7 @@ func TestService_Shorten(t *testing.T) {
 				redirectScheme: tt.args.redirectScheme,
 				pathLength:     tt.args.pathLength,
 				store:          st,
-				log:            zap.NewExample(),
+				log:            logger,
 			}
 
 			// Prepare request
@@ -211,7 +219,7 @@ func TestService_Shorten(t *testing.T) {
 			require.Equal(t, u.Host, tt.args.host)
 
 			// Check storage content
-			storedURL, err3 := st.Get(u.Path[1:])
+			storedURL, err3 := st.Get(ctx, u.Path[1:])
 			require.NoError(t, err3)
 			if tt.args.json {
 				assert.Equal(t, tt.want.url, storedURL)

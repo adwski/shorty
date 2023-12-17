@@ -1,12 +1,13 @@
 package resolver
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/adwski/shorty/internal/app/config/mockconfig"
+	"github.com/adwski/shorty/internal/app/mockapp"
 
 	"github.com/adwski/shorty/internal/storage"
 
@@ -98,19 +99,23 @@ func TestService_Redirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := mockconfig.NewStorage(t)
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+
+			st := mockapp.NewStorage(t)
+			ctx := context.Background()
 
 			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {
 				if !tt.args.invalid {
-					st.EXPECT().Get(tt.args.shortURL).Return("", storage.ErrNotFound)
+					st.EXPECT().Get(ctx, tt.args.shortURL).Return("", storage.ErrNotFound)
 				}
 			} else {
-				st.EXPECT().Get(tt.args.shortURL).Return(v, nil)
+				st.EXPECT().Get(ctx, tt.args.shortURL).Return(v, nil)
 			}
 
 			svc := &Service{
 				store: st,
-				log:   zap.NewExample(),
+				log:   logger,
 			}
 
 			r := httptest.NewRequest(http.MethodGet, "/"+tt.args.shortURL, nil)

@@ -1,22 +1,66 @@
 package main
 
 import (
-	"go.uber.org/zap"
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/adwski/shorty/internal/app"
 	"github.com/adwski/shorty/internal/app/config"
+	"go.uber.org/zap"
 )
 
 func main() {
+	logger, lvlParseOk := initLogger()
+	defer func() {
+		if errLog := logger.Sync(); errLog != nil && !errors.Is(errLog, syscall.ENOTTY) {
+			log.Println("failed to sync zap logger", errLog)
+		}
+	}()
+	if !lvlParseOk {
+		defer os.Exit(1)
+		return
+	}
+
 	cfg, err := config.New()
 	if err != nil {
-		zap.L().Fatal("cannot configure app", zap.Error(err))
+		logger.Fatal("cannot configure app", zap.Error(err))
 	}
 
-	shorty := app.NewShorty(cfg)
+	if err = run(logger, cfg); err != nil {
+		logger.Fatal("runtime error", zap.Error(err))
+	}
+}
+
+func run(logger *zap.Logger, cfg *config.Shorty) error {
+	var (
+		ctx, cancel = signal.NotifyContext(context.Background(), os.Interrupt)
+		store, err  = initStorage(ctx, logger, cfg.StorageConfig)
+	)
 	if err != nil {
-		cfg.Logger.Fatal("cannot create app", zap.Error(err))
+		return fmt.Errorf("cannot configure storage: %w", err)
 	}
 
-	run(cfg.Logger, shorty, cfg.Storage)
+	var (
+		wg     = &sync.WaitGroup{}
+		errc   = make(chan error)
+		shorty = app.NewShorty(logger, store, cfg)
+	)
+	wg.Add(1)
+	go shorty.Run(ctx, wg, errc)
+
+	select {
+	case <-ctx.Done():
+		logger.Warn("shutting down")
+	case <-errc:
+		cancel()
+	}
+	wg.Wait()
+	store.Close()
+	return nil
 }

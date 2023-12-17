@@ -8,12 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adwski/shorty/internal/storage"
+
 	"github.com/adwski/shorty/internal/app/config"
 	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
+	"github.com/adwski/shorty/internal/services/status"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -27,6 +30,14 @@ const (
 	defaultPathLength = 8
 )
 
+type Storage interface {
+	Get(ctx context.Context, key string) (url string, err error)
+	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
+	StoreBatch(ctx context.Context, urls []storage.URL) error
+	Ping(ctx context.Context) error
+	Close()
+}
+
 // Shorty is URL shortener app
 // It consists of shortener and redirector services
 // Also it uses key-value storage to store URLs and shortened paths.
@@ -37,39 +48,29 @@ type Shorty struct {
 }
 
 // NewShorty creates Shorty instance from config.
-func NewShorty(cfg *config.Shorty) *Shorty {
+func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty {
 	shortenerSvc := shortener.New(&shortener.Config{
-		Store:          cfg.Storage,
+		Store:          storage,
 		ServedScheme:   cfg.ServedScheme,
 		RedirectScheme: cfg.RedirectScheme,
 		Host:           cfg.Host,
-		Logger:         cfg.Logger,
+		Logger:         logger,
 		PathLength:     defaultPathLength,
 	})
-
 	resolverSvc := resolver.New(&resolver.Config{
-		Store:  cfg.Storage,
-		Logger: cfg.Logger,
+		Store:  storage,
+		Logger: logger,
+	})
+	statusSvc := status.New(&status.Config{
+		Storage: storage,
+		Logger:  logger,
 	})
 
-	router := chi.NewRouter()
-	router.Use(
-		requestid.New(&requestid.Config{
-			Generate: cfg.GenerateReqID,
-			Logger:   cfg.Logger,
-		}).ChainFunc,
-		logging.New(&logging.Config{
-			Logger: cfg.Logger,
-		}).ChainFunc,
-		compress.New().ChainFunc,
-	)
-
-	router.Post("/", shortenerSvc.ShortenPlain)
-	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
-	router.Get("/{path}", resolverSvc.Resolve)
+	router := getRouterWithMiddleware(logger, cfg.GenerateReqID)
+	bindServices(router, shortenerSvc, resolverSvc, statusSvc)
 
 	return &Shorty{
-		log:  cfg.Logger,
+		log:  logger,
 		host: cfg.Host,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
@@ -77,10 +78,37 @@ func NewShorty(cfg *config.Shorty) *Shorty {
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 			WriteTimeout:      defaultWriteTimeout,
 			IdleTimeout:       defaultIdleTimeout,
-			ErrorLog:          log.New(newSrvLogger(cfg.Logger), "", 0),
+			ErrorLog:          log.New(newSrvLogger(logger), "", 0),
 			Handler:           router,
 		},
 	}
+}
+
+func bindServices(router *chi.Mux,
+	shortenerSvc *shortener.Service,
+	resolverSvc *resolver.Service,
+	statusSvc *status.Service,
+) {
+	router.Post("/", shortenerSvc.ShortenPlain)
+	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
+	router.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
+	router.Get("/{path}", resolverSvc.Resolve)
+	router.Get("/ping", statusSvc.Ping)
+}
+
+func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) *chi.Mux {
+	router := chi.NewRouter()
+	router.Use(
+		requestid.New(&requestid.Config{
+			Generate: genReqID,
+			Logger:   logger,
+		}).HandlerFunc,
+		logging.New(&logging.Config{
+			Logger: logger,
+		}).HandlerFunc,
+		compress.New().HandlerFunc,
+	)
+	return router
 }
 
 func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {

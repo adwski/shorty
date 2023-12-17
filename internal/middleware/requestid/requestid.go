@@ -27,7 +27,7 @@ func New(cfg *Config) *Middleware {
 	return m
 }
 
-func (mw *Middleware) ChainFunc(h http.Handler) http.Handler {
+func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }

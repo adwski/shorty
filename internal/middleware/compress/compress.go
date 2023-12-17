@@ -74,7 +74,7 @@ func (rw *rwWrapper) WriteHeader(statusCode int) {
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
-func (mw *Middleware) ChainFunc(h http.Handler) http.Handler {
+func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
