@@ -1,0 +1,9 @@
+BEGIN TRANSACTION;
+
+ALTER TABLE urls
+    ADD COLUMN IF NOT EXISTS uid VARCHAR(30) NOT NULL DEFAULT '_',
+    ADD CONSTRAINT uid_not_empty CHECK (uid != '');
+
+CREATE INDEX urls_uid ON urls (uid);
+
+COMMIT;

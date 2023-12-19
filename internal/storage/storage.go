@@ -9,6 +9,7 @@ var (
 )
 
 type URL struct {
-	Short string
-	Orig  string
+	Short string `json:"short_url"`
+	Orig  string `json:"original_url"`
+	UID   string `json:"-"`
 }

@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/adwski/shorty/internal/session"
+	"github.com/adwski/shorty/internal/user"
+
 	"github.com/adwski/shorty/internal/storage"
 
 	"github.com/adwski/shorty/internal/app/mockapp"
@@ -168,6 +171,7 @@ func TestService_Shorten(t *testing.T) {
 			}
 
 			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(body))
+			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "test"}))
 			for k, v := range tt.args.headers {
 				r.Header.Set(k, v)
 			}

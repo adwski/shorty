@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/adwski/shorty/internal/session"
+	"github.com/adwski/shorty/internal/user"
+
 	"github.com/adwski/shorty/internal/app/mockapp"
 
 	"github.com/stretchr/testify/assert"
@@ -71,6 +74,7 @@ func TestService_ShortenBatch(t *testing.T) {
 			body, err := json.Marshal(tt.args.batch)
 			require.NoError(t, err)
 			r := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "test"}))
 			r.Header.Set("Content-Type", "application/json")
 
 			// Do request

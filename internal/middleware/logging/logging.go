@@ -21,7 +21,7 @@ type Config struct {
 
 func New(cfg *Config) *Middleware {
 	return &Middleware{
-		log: cfg.Logger,
+		log: cfg.Logger.With(zap.String("component", "http")),
 	}
 }
 

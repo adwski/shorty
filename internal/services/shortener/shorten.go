@@ -49,6 +49,8 @@ func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	svc.log.Debug("storing url in plain handler")
+
 	if shortPath, err = svc.storeURL(req.Context(), srcURL.String()); err != nil {
 		if !errors.Is(err, storage.ErrConflict) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -95,11 +97,13 @@ func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	svc.log.Debug("storing url in json handler")
+
 	shortPath, errStore := svc.storeURL(req.Context(), srcURL.String())
 	if errStore != nil {
 		if !errors.Is(errStore, storage.ErrConflict) {
 			w.WriteHeader(http.StatusInternalServerError)
-			svc.log.Error("cannot store url", zap.Error(err))
+			svc.log.Error("cannot store url", zap.Error(errStore))
 			return
 		}
 	}

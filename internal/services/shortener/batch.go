@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/session"
+
 	"github.com/adwski/shorty/internal/generators"
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/adwski/shorty/internal/validate"
@@ -96,6 +98,11 @@ func getURLBatchFromJSONBody(req *http.Request) (batchReq []BatchURL, err error)
 }
 
 func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]BatchShortened, error) {
+	user, ok := session.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("middleware did not provide user context")
+	}
+
 	var (
 		err  error
 		urls = make([]storage.URL, len(batch))
@@ -104,6 +111,7 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 	for i := range batch {
 		urls[i].Short = generators.RandString(svc.pathLength)
 		urls[i].Orig = batch[i].URL
+		urls[i].UID = user.ID
 	}
 
 	svc.log.Debug("sending batch to storage",

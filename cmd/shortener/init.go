@@ -31,27 +31,16 @@ func initLogger() (*zap.Logger, bool) {
 	})
 	var (
 		err                 error
-		logLvl              zapcore.Level
-		lvlOk               bool
 		envEmpty            bool
+		logLvl              = defaultLogLevel
 		logLevel, envExists = os.LookupEnv(envLogLevel)
 	)
 	if envExists {
 		if logLevel == "" {
 			envEmpty = true
 		} else {
-			if logLvl, err = zapcore.ParseLevel(logLevel); err == nil {
-				// set default level just to create logger and print out error
-				logLvl = defaultLogLevel
-			} else {
-				// loglevel value is correct
-				lvlOk = true
-			}
+			logLvl, err = zapcore.ParseLevel(logLevel)
 		}
-	} else {
-		// env was not set, using default level
-		lvlOk = true
-		logLvl = defaultLogLevel
 	}
 	logger := zap.New(zapcore.NewCore(encoder, os.Stdout, logLvl))
 	if envEmpty {
@@ -59,7 +48,7 @@ func initLogger() (*zap.Logger, bool) {
 	} else if err != nil {
 		logger.Error("could not parse log level", zap.String("env", envLogLevel), zap.Error(err))
 	}
-	return logger, lvlOk
+	return logger, err == nil
 }
 
 func initStorage(ctx context.Context, logger *zap.Logger, cfg *config.Storage) (store app.Storage, err error) {

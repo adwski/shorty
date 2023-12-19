@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,7 +76,9 @@ func TestMiddleware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mw := New(&Config{Generate: tt.args.generate})
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+			mw := New(&Config{Generate: tt.args.generate, Logger: logger})
 
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			if tt.args.incomingReqID != "" {

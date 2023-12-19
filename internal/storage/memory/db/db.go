@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/user"
+
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -26,6 +28,7 @@ type Record struct {
 	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UID         string `json:"user"`
 }
 
 func NewURLRecordFromBytes(data []byte) (*Record, error) {
@@ -38,6 +41,9 @@ func NewURLRecordFromBytes(data []byte) (*Record, error) {
 	}
 	if _, err := url.Parse(record.OriginalURL); err != nil {
 		return nil, fmt.Errorf("malformed url for %s: %w", record.UUID, err)
+	}
+	if _, err := user.NewFromUID(record.UID); err != nil {
+		return nil, fmt.Errorf("malformed uid for %s: %w", record.UID, err)
 	}
 	return record, nil
 }

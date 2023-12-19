@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/session"
+
 	"github.com/adwski/shorty/internal/generators"
 
 	"github.com/adwski/shorty/internal/storage"
@@ -24,6 +26,7 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
+	ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error)
 }
 
 // Service implements http handler for shortened urls management.
@@ -41,24 +44,33 @@ func (svc *Service) getServedURL(shortPath string) string {
 }
 
 func (svc *Service) storeURL(ctx context.Context, u string) (path string, err error) {
+	user, ok := session.GetUserFromContext(ctx)
+	if !ok {
+		err = errors.New("middleware did not provide user context")
+		return
+	}
+
 	for i := 1; i <= defaultStoreRetries; i++ {
 		path = generators.RandString(svc.pathLength)
 
 		svc.log.Debug("storing url",
 			zap.String("key", path),
 			zap.Int("try", i),
-			zap.String("url", u))
+			zap.String("url", u),
+			zap.String("uid", user.ID))
 
 		var storedPath string
 		if storedPath, err = svc.store.Store(ctx, &storage.URL{
 			Short: path,
 			Orig:  u,
+			UID:   user.ID,
 		}, false); err != nil {
 			if errors.Is(err, storage.ErrConflict) {
 				path = storedPath
 				return
+			} else if errors.Is(err, storage.ErrAlreadyExists) {
+				continue
 			}
-			continue
 		}
 		return
 	}
@@ -70,6 +82,10 @@ func getRedirectURLFromBody(req *http.Request) (u *url.URL, err error) {
 	var body []byte
 	if body, err = readBody(req); err != nil {
 		err = fmt.Errorf("cannot get url from request body: %w", err)
+		return
+	}
+	if len(body) == 0 {
+		err = fmt.Errorf("empty body")
 		return
 	}
 	if u, err = url.Parse(string(body)); err != nil {

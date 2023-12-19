@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
-
 	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/middleware/auth"
 	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/services/status"
+	"github.com/adwski/shorty/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -34,6 +34,7 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
+	ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error)
 	Ping(ctx context.Context) error
 	Close()
 }
@@ -66,11 +67,20 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 		Logger:  logger,
 	})
 
-	router := getRouterWithMiddleware(logger, cfg.GenerateReqID)
-	bindServices(router, shortenerSvc, resolverSvc, statusSvc)
+	r := getRouterWithMiddleware(logger, cfg.GenerateReqID)
+	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Get("/api/user/urls", shortenerSvc.GetURLsByUser)
+			r.Post("/api/shorten", shortenerSvc.ShortenJSON)
+			r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
+			r.Post("/", shortenerSvc.ShortenPlain)
+		})
+	})
+	r.Get("/{path}", resolverSvc.Resolve)
+	r.Get("/ping", statusSvc.Ping)
 
 	return &Shorty{
-		log:  logger,
+		log:  logger.With(zap.String("component", "api")),
 		host: cfg.Host,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
@@ -79,24 +89,12 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 			WriteTimeout:      defaultWriteTimeout,
 			IdleTimeout:       defaultIdleTimeout,
 			ErrorLog:          log.New(newSrvLogger(logger), "", 0),
-			Handler:           router,
+			Handler:           r,
 		},
 	}
 }
 
-func bindServices(router *chi.Mux,
-	shortenerSvc *shortener.Service,
-	resolverSvc *resolver.Service,
-	statusSvc *status.Service,
-) {
-	router.Post("/", shortenerSvc.ShortenPlain)
-	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
-	router.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
-	router.Get("/{path}", resolverSvc.Resolve)
-	router.Get("/ping", statusSvc.Ping)
-}
-
-func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) *chi.Mux {
+func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) chi.Router {
 	router := chi.NewRouter()
 	router.Use(
 		requestid.New(&requestid.Config{
@@ -144,7 +142,7 @@ type srvLogger struct {
 
 func newSrvLogger(logger *zap.Logger) *srvLogger {
 	return &srvLogger{
-		logger: logger.With(zap.String("type", "server")),
+		logger: logger.With(zap.String("component", "server")),
 	}
 }
 

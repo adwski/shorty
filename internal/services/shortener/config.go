@@ -20,6 +20,6 @@ func New(cfg *Config) *Service {
 		redirectScheme: cfg.RedirectScheme,
 		host:           cfg.Host,
 		pathLength:     cfg.PathLength,
-		log:            cfg.Logger,
+		log:            cfg.Logger.With(zap.String("component", "shortener")),
 	}
 }

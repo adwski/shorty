@@ -20,7 +20,7 @@ type Config struct {
 }
 
 func New(cfg *Config) *Middleware {
-	m := &Middleware{log: cfg.Logger}
+	m := &Middleware{log: cfg.Logger.With(zap.String("component", "request-id"))}
 	if cfg.Generate {
 		m.gen = uuid.NewGen()
 	}

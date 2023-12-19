@@ -55,8 +55,25 @@ func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (str
 		UUID:        u.String(),
 		ShortURL:    url.Short,
 		OriginalURL: url.Orig,
+		UID:         url.UID,
 	}
 	return "", nil
+}
+
+func (m *Memory) ListUserURLs(_ context.Context, uid string) ([]*storage.URL, error) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	var urls []*storage.URL
+	for _, record := range m.DB {
+		if record.UID == uid {
+			urls = append(urls, &storage.URL{
+				Short: record.ShortURL,
+				Orig:  record.OriginalURL,
+				UID:   uid,
+			})
+		}
+	}
+	return urls, nil
 }
 
 func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
@@ -78,6 +95,7 @@ func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 			UUID:        IDs[i],
 			ShortURL:    url.Short,
 			OriginalURL: url.Orig,
+			UID:         url.UID,
 		}
 	}
 	return nil

@@ -82,7 +82,7 @@ func New(ctx context.Context, cfg *Config) (*File, error) {
 
 	s := &File{
 		Memory:   st,
-		log:      cfg.Logger,
+		log:      cfg.Logger.With(zap.String("component", "fs-storage")),
 		filePath: cfg.FilePath,
 		finish:   make(chan struct{}),
 		done:     make(chan struct{}, 1),
