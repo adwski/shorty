@@ -9,7 +9,7 @@ unittests: mock
 
 .PHONY: build
 build:
-	go build -o ./cmd/shortener/shortener ./cmd/shortener/*.go
+	go build -race -o ./cmd/shortener/shortener ./cmd/shortener/*.go
 
 # Run it like this
 # > make shortenertest TESTNUM=7
