@@ -54,6 +54,53 @@ func (_c *Storage_Close_Call) RunAndReturn(run func()) *Storage_Close_Call {
 	return _c
 }
 
+// DeleteUserURLs provides a mock function with given fields: ctx, urls
+func (_m *Storage) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
+	ret := _m.Called(ctx, urls)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUserURLs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []storage.URL) error); ok {
+		r0 = rf(ctx, urls)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Storage_DeleteUserURLs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserURLs'
+type Storage_DeleteUserURLs_Call struct {
+	*mock.Call
+}
+
+// DeleteUserURLs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - urls []storage.URL
+func (_e *Storage_Expecter) DeleteUserURLs(ctx interface{}, urls interface{}) *Storage_DeleteUserURLs_Call {
+	return &Storage_DeleteUserURLs_Call{Call: _e.mock.On("DeleteUserURLs", ctx, urls)}
+}
+
+func (_c *Storage_DeleteUserURLs_Call) Run(run func(ctx context.Context, urls []storage.URL)) *Storage_DeleteUserURLs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]storage.URL))
+	})
+	return _c
+}
+
+func (_c *Storage_DeleteUserURLs_Call) Return(_a0 error) *Storage_DeleteUserURLs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Storage_DeleteUserURLs_Call) RunAndReturn(run func(context.Context, []storage.URL) error) *Storage_DeleteUserURLs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Get provides a mock function with given fields: ctx, key
 func (_m *Storage) Get(ctx context.Context, key string) (string, error) {
 	ret := _m.Called(ctx, key)

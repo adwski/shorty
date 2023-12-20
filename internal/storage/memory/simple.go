@@ -38,13 +38,16 @@ func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	if !ok {
 		return "", storage.ErrNotFound
 	}
+	if record.Deleted {
+		return "", storage.ErrDeleted
+	}
 	return record.OriginalURL, nil
 }
 
 func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if _, ok := m.DB[url.Short]; ok && !overwrite {
+	if u, ok := m.DB[url.Short]; ok && !(overwrite || u.Deleted) {
 		return "", storage.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()
@@ -76,12 +79,27 @@ func (m *Memory) ListUserURLs(_ context.Context, uid string) ([]*storage.URL, er
 	return urls, nil
 }
 
+func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) error {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	for _, url := range urls {
+		if record, ok := m.DB[url.Short]; ok {
+			if record.UID == url.UID {
+				record.Deleted = true
+				m.DB[url.Short] = record
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	IDs := make([]string, len(urls))
 	for i, url := range urls {
-		if _, ok := m.DB[url.Short]; ok {
+		if u, ok := m.DB[url.Short]; ok && !u.Deleted {
 			return storage.ErrAlreadyExists
 		}
 		u, err := m.gen.NewV4()

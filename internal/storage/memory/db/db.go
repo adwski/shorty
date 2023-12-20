@@ -29,6 +29,7 @@ type Record struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 	UID         string `json:"user"`
+	Deleted     bool   `json:"deleted"`
 }
 
 func NewURLRecordFromBytes(data []byte) (*Record, error) {

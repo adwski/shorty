@@ -35,6 +35,7 @@ type Storage interface {
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
 	ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error)
+	DeleteUserURLs(ctx context.Context, urls []storage.URL) error
 	Ping(ctx context.Context) error
 	Close()
 }
@@ -43,9 +44,10 @@ type Storage interface {
 // It consists of shortener and redirector services
 // Also it uses key-value storage to store URLs and shortened paths.
 type Shorty struct {
-	log    *zap.Logger
-	server *http.Server
-	host   string
+	log       *zap.Logger
+	server    *http.Server
+	shortener *shortener.Service
+	host      string
 }
 
 // NewShorty creates Shorty instance from config.
@@ -70,7 +72,8 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 	r := getRouterWithMiddleware(logger, cfg.GenerateReqID)
 	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Get("/api/user/urls", shortenerSvc.GetURLsByUser)
+			r.Get("/api/user/urls", shortenerSvc.GetURLs)
+			r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
 			r.Post("/api/shorten", shortenerSvc.ShortenJSON)
 			r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
 			r.Post("/", shortenerSvc.ShortenPlain)
@@ -80,8 +83,9 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 	r.Get("/ping", statusSvc.Ping)
 
 	return &Shorty{
-		log:  logger.With(zap.String("component", "api")),
-		host: cfg.Host,
+		log:       logger.With(zap.String("component", "api")),
+		host:      cfg.Host,
+		shortener: shortenerSvc,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
@@ -110,10 +114,12 @@ func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) chi.Router {
 }
 
 func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
+	wg.Add(1)
+	go sh.shortener.Run(ctx, wg)
+
 	sh.log.Info("starting server",
 		zap.String("address", sh.server.Addr),
 		zap.String("host", sh.host))
-
 	errSrv := make(chan error)
 	go func(errc chan error) {
 		errc <- sh.server.ListenAndServe()

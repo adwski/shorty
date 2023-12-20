@@ -22,7 +22,7 @@ shortenertest: build
                       -server-port=$$(random unused-port) \
                       -file-storage-path=/tmp/short-url-db-test.json || exit 1 ; \
 	done
-	for num in 10 11 12 13 14; do \
+	for num in 10 11 12 13 14 15; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \

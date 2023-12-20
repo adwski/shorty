@@ -47,9 +47,12 @@ func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if redirect, err = svc.store.Get(req.Context(), req.URL.Path[1:]); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
 			w.WriteHeader(http.StatusNotFound)
-		} else {
+		case errors.Is(err, storage.ErrDeleted):
+			w.WriteHeader(http.StatusGone)
+		default:
 			svc.log.Error("cannot get redirect", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 		}

@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/adwski/shorty/internal/session"
+	"github.com/adwski/shorty/internal/user"
 
 	"github.com/adwski/shorty/internal/generators"
 	"github.com/adwski/shorty/internal/storage"
@@ -28,6 +29,14 @@ type BatchShortened struct {
 
 // ShortenBatch shortens batch of urls.
 func (svc *Service) ShortenBatch(w http.ResponseWriter, req *http.Request) {
+	u, ok := session.GetUserFromContext(req.Context())
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		svc.log.Error(ErrNoUser.Error())
+		return
+	}
+	logf := svc.log.With(zap.String("id", u.GetRequestID()))
+
 	var (
 		batchURLs   []BatchURL
 		shortURLs   []BatchShortened
@@ -36,32 +45,32 @@ func (svc *Service) ShortenBatch(w http.ResponseWriter, req *http.Request) {
 	)
 	if err = validate.ShortenRequestJSON(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("shorten request is not valid", zap.Error(err))
+		logf.Error("shorten request is not valid", zap.Error(err))
 		return
 	}
 
 	if batchURLs, err = getURLBatchFromJSONBody(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("cannot get url batch from request body", zap.Error(err))
+		logf.Error("cannot get url batch from request body", zap.Error(err))
 		return
 	}
 
-	if shortURLs, err = svc.shortenBatch(req.Context(), batchURLs); err != nil {
+	if shortURLs, err = svc.shortenBatch(req.Context(), u, batchURLs); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error("cannot store url batch", zap.Error(err))
+		logf.Error("cannot store url batch", zap.Error(err))
 		return
 	}
 
 	if shortenResp, err = json.Marshal(&shortURLs); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error("cannot marshall response", zap.Error(err))
+		logf.Error("cannot marshall response", zap.Error(err))
 		return
 	}
 
 	w.Header().Set(headerContentType, "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write(shortenResp); err != nil {
-		svc.log.Error("error writing json body", zap.Error(err))
+		logf.Error("error writing json body", zap.Error(err))
 	}
 }
 
@@ -97,12 +106,7 @@ func getURLBatchFromJSONBody(req *http.Request) (batchReq []BatchURL, err error)
 	return
 }
 
-func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]BatchShortened, error) {
-	user, ok := session.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("middleware did not provide user context")
-	}
-
+func (svc *Service) shortenBatch(ctx context.Context, u *user.User, batch []BatchURL) ([]BatchShortened, error) {
 	var (
 		err  error
 		urls = make([]storage.URL, len(batch))
@@ -111,11 +115,8 @@ func (svc *Service) shortenBatch(ctx context.Context, batch []BatchURL) ([]Batch
 	for i := range batch {
 		urls[i].Short = generators.RandString(svc.pathLength)
 		urls[i].Orig = batch[i].URL
-		urls[i].UID = user.ID
+		urls[i].UID = u.ID
 	}
-
-	svc.log.Debug("sending batch to storage",
-		zap.Int("length", len(batch)))
 
 	if err = svc.store.StoreBatch(ctx, urls); err != nil {
 		return nil, fmt.Errorf("cannot store batch: %w", err)

@@ -8,12 +8,21 @@ import (
 )
 
 type User struct {
-	ID  string
-	new bool
+	ID    string
+	reqID string
+	new   bool
 }
 
 func (u *User) IsNew() bool {
 	return u.new
+}
+
+func (u *User) SetRequestID(reqID string) {
+	u.reqID = reqID
+}
+
+func (u *User) GetRequestID() string {
+	return u.reqID
 }
 
 func NewWithID(id string) *User {

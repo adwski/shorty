@@ -101,7 +101,7 @@ func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (str
 		return "", errors.New("storage is shutting down")
 	}
 	if _, err := s.Memory.Store(ctx, url, overwrite); err != nil {
-		return "", fmt.Errorf("cannot store url: %w", err)
+		return "", fmt.Errorf("memory storage error: %w", err)
 	}
 	s.changed.Store(true)
 	return "", nil
@@ -112,7 +112,18 @@ func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 		return errors.New("storage is shutting down")
 	}
 	if err := s.Memory.StoreBatch(ctx, urls); err != nil {
-		return fmt.Errorf("cannot store url: %w", err)
+		return fmt.Errorf("memory storage error: %w", err)
+	}
+	s.changed.Store(true)
+	return nil
+}
+
+func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
+	if s.shutdown.Load() {
+		return errors.New("storage is shutting down")
+	}
+	if err := s.Memory.DeleteUserURLs(ctx, urls); err != nil {
+		return fmt.Errorf("memory storage error: %w", err)
 	}
 	s.changed.Store(true)
 	return nil

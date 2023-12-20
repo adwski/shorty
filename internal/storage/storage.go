@@ -6,6 +6,7 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
 	ErrConflict      = errors.New("conflict")
+	ErrDeleted       = errors.New("deleted")
 )
 
 type URL struct {

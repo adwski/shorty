@@ -53,7 +53,9 @@ func (a *Auth) GetUserFromJWT(signedToken string) (*user.User, error) {
 	}
 
 	if claims, ok := token.Claims.(*Claims); !ok {
-		return nil, errors.New("token does not contain user id")
+		return nil, errors.New("token does not contain claims")
+	} else if claims.UID == "" {
+		return nil, errors.New("uid claim is empty")
 	} else {
 		return user.NewWithID(claims.UID), nil
 	}

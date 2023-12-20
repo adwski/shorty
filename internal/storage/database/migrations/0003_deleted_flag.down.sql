@@ -1,0 +1,7 @@
+BEGIN TRANSACTION;
+
+DROP INDEX urls_deleted;
+
+ALTER TABLE urls DROP COLUMN deleted;
+
+COMMIT;

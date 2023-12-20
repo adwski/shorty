@@ -46,6 +46,8 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Set-Cookie", sessionCookie.String())
 	}
 
+	u.SetRequestID(w.Header().Get("X-Request-ID"))
+
 	// Call next handler with user context
 	mw.handler.ServeHTTP(w, r.WithContext(session.SetUserContext(r.Context(), u)))
 }
