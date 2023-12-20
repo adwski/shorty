@@ -36,7 +36,10 @@ func NewFlusher(log *zap.Logger, in chan *storage.URL, flush func(context.Contex
 func (s *Flusher) Run(ctx context.Context, wg *sync.WaitGroup) {
 	s.log.Debug("flusher started")
 
-	defer wg.Done()
+	defer func() {
+		s.log.Debug("flusher stopped")
+		wg.Done()
+	}()
 	for {
 		select {
 		case record := <-s.in:

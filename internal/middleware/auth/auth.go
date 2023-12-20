@@ -23,15 +23,18 @@ func New(logger *zap.Logger, jwtSecret string) *Middleware {
 }
 
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	requestID := r.Header.Get("X-Request-ID")
+	logf := mw.log.With(zap.String("id", requestID))
+
 	u, err := mw.GetUser(r)
 	if err != nil {
 		// Missing or invalid session cookie
 		// Generate a new user
-		mw.log.Debug("cannot get session from cookie", zap.Error(err))
+		logf.Debug("cannot get session from cookie", zap.Error(err))
 		u, err = user.New()
 		if err != nil {
 			// we're helpless here
-			mw.log.Debug("cannot create new user", zap.Error(err))
+			logf.Debug("cannot create new user", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -39,15 +42,14 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Set Cookie for new user
 		sessionCookie, errS := mw.CreateJWTCookie(u)
 		if errS != nil {
-			mw.log.Debug("cannot create session cookie for user", zap.Error(errS))
+			logf.Debug("cannot create session cookie for user", zap.Error(errS))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Set-Cookie", sessionCookie.String())
 	}
 
-	u.SetRequestID(w.Header().Get("X-Request-ID"))
-
+	u.SetRequestID(requestID)
 	// Call next handler with user context
 	mw.handler.ServeHTTP(w, r.WithContext(session.SetUserContext(r.Context(), u)))
 }

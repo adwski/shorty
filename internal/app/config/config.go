@@ -31,7 +31,7 @@ func New() (*Shorty, error) {
 		databaseDSN     = flag.String("d", "", "postgres connection DSN")
 		jwtSecret       = flag.String("jwt_secret", "supersecret", "jwt cookie secret key")
 		redirectScheme  = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
-		traceDB         = flag.Bool("trace_db", true, "print db wire protocol traces")
+		traceDB         = flag.Bool("trace_db", false, "print db wire protocol traces")
 		trustRequestID  = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
