@@ -2,7 +2,6 @@ package shortener
 
 import (
 	"github.com/adwski/shorty/internal/buffer"
-	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -18,12 +17,8 @@ type Config struct {
 func New(cfg *Config) *Service {
 	logger := cfg.Logger.With(zap.String("component", "shortener"))
 
-	chForURLsDeletion := make(chan *storage.URL)
-
 	svc := &Service{
-		store: cfg.Store,
-
-		delURLs:        chForURLsDeletion,
+		store:          cfg.Store,
 		servedScheme:   cfg.ServedScheme,
 		redirectScheme: cfg.RedirectScheme,
 		host:           cfg.Host,
@@ -31,7 +26,6 @@ func New(cfg *Config) *Service {
 		log:            logger,
 	}
 
-	svc.flusher = buffer.NewFlusher(cfg.Logger, chForURLsDeletion, svc.deleteURLs)
-
+	svc.flusher, svc.delURLs = buffer.NewFlusher(cfg.Logger, svc.deleteURLs)
 	return svc
 }
