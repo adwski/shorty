@@ -38,8 +38,8 @@ type Storage interface {
 // Service implements http handler for shortened urls management.
 type Service struct {
 	store          Storage
-	flusher        *buffer.Flusher
-	delURLs        chan *storage.URL
+	flusher        *buffer.Flusher[storage.URL]
+	delURLs        chan storage.URL
 	log            *zap.Logger
 	servedScheme   string
 	redirectScheme string

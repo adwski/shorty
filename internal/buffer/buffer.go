@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -15,25 +14,25 @@ const (
 	bufFlushInterval = 5 * time.Second
 )
 
-type Flusher struct {
+type Flusher[T any] struct {
 	log   *zap.Logger
-	in    chan *storage.URL
-	flush func(context.Context, []storage.URL)
-	buf   []storage.URL
+	in    chan T
+	flush func(context.Context, []T)
+	buf   []T
 	size  int
 }
 
-func NewFlusher(log *zap.Logger, flush func(context.Context, []storage.URL)) (*Flusher, chan *storage.URL) {
-	in := make(chan *storage.URL)
-	return &Flusher{
+func NewFlusher[T any](log *zap.Logger, flush func(context.Context, []T)) (*Flusher[T], chan T) {
+	in := make(chan T)
+	return &Flusher[T]{
 		log:   log.With(zap.String("component", "flusher")),
 		in:    in,
 		flush: flush,
-		buf:   make([]storage.URL, 0, bufAllocSize),
+		buf:   make([]T, 0, bufAllocSize),
 	}, in
 }
 
-func (s *Flusher) Run(ctx context.Context, wg *sync.WaitGroup) {
+func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 	s.log.Debug("flusher started")
 
 	defer func() {
@@ -42,7 +41,7 @@ func (s *Flusher) Run(ctx context.Context, wg *sync.WaitGroup) {
 	}()
 
 	doFlush := func() {
-		flushed := make([]storage.URL, len(s.buf))
+		flushed := make([]T, len(s.buf))
 		copy(flushed, s.buf)
 		s.buf = s.buf[0:0]
 		s.flush(ctx, flushed)
@@ -52,7 +51,7 @@ func (s *Flusher) Run(ctx context.Context, wg *sync.WaitGroup) {
 		select {
 		case record := <-s.in:
 			s.size++
-			s.buf = append(s.buf, *record)
+			s.buf = append(s.buf, record)
 			if len(s.buf) >= bufFillSize {
 				s.log.Debug("flushing on buffer fill")
 				doFlush()
