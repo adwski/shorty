@@ -58,8 +58,3 @@ func (mw *Middleware) HandleFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
-
-func (mw *Middleware) Chain(h http.Handler) *Middleware {
-	mw.handler = h
-	return mw
-}

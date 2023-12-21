@@ -32,11 +32,6 @@ func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	return mw
 }
 
-func (mw *Middleware) Chain(h http.Handler) *Middleware {
-	mw.handler = h
-	return mw
-}
-
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if mw.gen != nil {
 		mw.setRequestID(r)

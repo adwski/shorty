@@ -128,7 +128,7 @@ func TestMiddleware(t *testing.T) {
 				body:   tt.args.body,
 				panic:  tt.args.panic,
 			}
-			mw.Chain(s)
+			mw.HandlerFunc(s)
 
 			r := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 			w := httptest.NewRecorder()

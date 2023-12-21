@@ -89,7 +89,7 @@ func TestMiddleware(t *testing.T) {
 				body:        []byte("zxczxczxc"),
 				contentType: tt.args.respContentType,
 			}
-			mw.Chain(s)
+			mw.HandlerFunc(s)
 
 			w := httptest.NewRecorder()
 

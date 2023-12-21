@@ -85,7 +85,7 @@ func TestMiddleware(t *testing.T) {
 				r.Header.Set("X-Request-ID", tt.args.incomingReqID)
 			}
 			s := &stub{}
-			mw.Chain(s)
+			mw.HandlerFunc(s)
 			mw.ServeHTTP(nil, r)
 
 			reqID := s.r.Header.Get("X-Request-ID")
