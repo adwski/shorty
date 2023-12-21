@@ -47,8 +47,8 @@ func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 
 	for _, short := range shorts {
 		svc.delURLs <- &storage.URL{
-			Short: short,
-			UID:   u.ID,
+			Short:  short,
+			UserID: u.ID,
 		}
 	}
 	w.WriteHeader(http.StatusAccepted)

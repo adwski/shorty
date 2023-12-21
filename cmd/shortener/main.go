@@ -20,6 +20,7 @@ func main() {
 	defer func() {
 		if errLog := logger.Sync(); errLog != nil &&
 			!errors.Is(errLog, syscall.EBADF) &&
+			!errors.Is(errLog, syscall.EINVAL) &&
 			!errors.Is(errLog, syscall.ENOTTY) {
 			log.Println("failed to sync zap logger", errLog)
 		}

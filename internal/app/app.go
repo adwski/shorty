@@ -34,7 +34,7 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
-	ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error)
+	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
 	DeleteUserURLs(ctx context.Context, urls []storage.URL) error
 	Ping(ctx context.Context) error
 	Close()
@@ -71,13 +71,11 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 
 	r := getRouterWithMiddleware(logger, cfg.GenerateReqID)
 	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Get("/api/user/urls", shortenerSvc.GetURLs)
-			r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
-			r.Post("/api/shorten", shortenerSvc.ShortenJSON)
-			r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
-			r.Post("/", shortenerSvc.ShortenPlain)
-		})
+		r.Get("/api/user/urls", shortenerSvc.GetURLs)
+		r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
+		r.Post("/api/shorten", shortenerSvc.ShortenJSON)
+		r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
+		r.Post("/", shortenerSvc.ShortenPlain)
 	})
 	r.Get("/{path}", resolverSvc.Resolve)
 	r.Get("/ping", statusSvc.Ping)

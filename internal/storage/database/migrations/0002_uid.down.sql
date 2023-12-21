@@ -1,8 +1,8 @@
 BEGIN TRANSACTION;
 
-DROP INDEX urls_uid;
+DROP INDEX urls_userid;
 
-ALTER TABLE urls DROP CONSTRAINT IF EXISTS uid_not_empty;
-ALTER TABLE urls RENAME COLUMN uid TO __uid;
+ALTER TABLE urls DROP CONSTRAINT IF EXISTS userid_not_empty;
+ALTER TABLE urls RENAME COLUMN userid TO __userid;
 
 COMMIT;

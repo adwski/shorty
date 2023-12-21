@@ -115,7 +115,7 @@ func (svc *Service) shortenBatch(ctx context.Context, u *user.User, batch []Batc
 	for i := range batch {
 		urls[i].Short = generators.RandString(svc.pathLength)
 		urls[i].Orig = batch[i].URL
-		urls[i].UID = u.ID
+		urls[i].UserID = u.ID
 	}
 
 	if err = svc.store.StoreBatch(ctx, urls); err != nil {

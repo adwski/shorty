@@ -9,24 +9,24 @@ import (
 type ctxKey int
 
 const (
-	ctxKeyUID ctxKey = iota
-	ctxReqID
+	ctxKeyUserID ctxKey = iota
+	ctxKeyReqID
 )
 
 func SetUserContext(parent context.Context, u *user.User) context.Context {
-	return context.WithValue(parent, ctxKeyUID, u)
+	return context.WithValue(parent, ctxKeyUserID, u)
 }
 
 func GetUserFromContext(ctx context.Context) (u *user.User, ok bool) {
-	u, ok = ctx.Value(ctxKeyUID).(*user.User)
+	u, ok = ctx.Value(ctxKeyUserID).(*user.User)
 	return
 }
 
 func SetRequestID(parent context.Context, reqID string) context.Context {
-	return context.WithValue(parent, ctxReqID, reqID)
+	return context.WithValue(parent, ctxKeyReqID, reqID)
 }
 
 func GetRequestID(ctx context.Context) (reqID string, ok bool) {
-	reqID, ok = ctx.Value(ctxReqID).(string)
+	reqID, ok = ctx.Value(ctxKeyReqID).(string)
 	return
 }

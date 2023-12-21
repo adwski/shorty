@@ -47,8 +47,8 @@ func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool)
 		return db.storeWithOverwrite(ctx, url)
 	}
 
-	query := `insert into urls(hash, orig, uid) values ($1,$2,$3)`
-	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig, url.UID)
+	query := `insert into urls(hash, orig, userid) values ($1,$2,$3)`
+	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig, url.UserID)
 
 	if err == nil {
 		if tag.RowsAffected() != 1 {
@@ -110,7 +110,7 @@ func (db *Database) StoreBatch(ctx context.Context, urls []storage.URL) error {
 		// There's an upper limit for number of queries that can be bundled in single batch,
 		// but it depends on a particular setup.
 		// https://youtu.be/sXMSWhcHCf8?t=33m55s
-		batch.Queue(`insert into urls(hash, orig, uid) values ($1, $2, $3)`, url.Short, url.Orig, url.UID)
+		batch.Queue(`insert into urls(hash, orig, userid) values ($1, $2, $3)`, url.Short, url.Orig, url.UserID)
 	}
 
 	if err := db.pool.SendBatch(ctx, batch).Close(); err != nil {
@@ -141,15 +141,15 @@ func (db *Database) Get(ctx context.Context, hash string) (string, error) {
 	return url, nil
 }
 
-func (db *Database) ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error) {
-	query := `select hash, orig from urls where uid = $1 and deleted = false`
-	rows, err := db.pool.Query(ctx, query, uid)
+func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage.URL, error) {
+	query := `select hash, orig from urls where userid = $1 and deleted = false`
+	rows, err := db.pool.Query(ctx, query, userID)
 	if err != nil && errors.Is(err, pgx.ErrNoRows) {
 		err = storage.ErrNotFound
 		return nil, err
 	}
 	db.log.Debug("executing query",
-		zap.String("uid", uid),
+		zap.String("userID", userID),
 		zap.Int64("affected", rows.CommandTag().RowsAffected()))
 	// Use generic CollectRows()
 	// https://youtu.be/sXMSWhcHCf8?t=995
@@ -170,7 +170,7 @@ func (db *Database) ListUserURLs(ctx context.Context, uid string) ([]*storage.UR
 func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
 	batch := &pgx.Batch{}
 	for _, url := range urls {
-		batch.Queue(`update urls set deleted = true where hash = $1 and uid = $2 `, url.Short, url.UID)
+		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 `, url.Short, url.UserID)
 	}
 	if err := db.pool.SendBatch(ctx, batch).Close(); err != nil {
 		return fmt.Errorf("pgx batch delete error: %w", err)

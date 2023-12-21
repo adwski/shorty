@@ -31,7 +31,7 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
-	ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error)
+	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
 	DeleteUserURLs(ctx context.Context, urls []storage.URL) error
 }
 
@@ -61,9 +61,9 @@ func (svc *Service) storeURL(ctx context.Context, user *user.User, u string) (pa
 
 		var storedPath string
 		if storedPath, err = svc.store.Store(ctx, &storage.URL{
-			Short: path,
-			Orig:  u,
-			UID:   user.ID,
+			Short:  path,
+			Orig:   u,
+			UserID: user.ID,
 		}, false); err != nil {
 			if errors.Is(err, storage.ErrConflict) {
 				path = storedPath

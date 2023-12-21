@@ -158,9 +158,9 @@ func (_c *Storage_Get_Call) RunAndReturn(run func(context.Context, string) (stri
 	return _c
 }
 
-// ListUserURLs provides a mock function with given fields: ctx, uid
-func (_m *Storage) ListUserURLs(ctx context.Context, uid string) ([]*storage.URL, error) {
-	ret := _m.Called(ctx, uid)
+// ListUserURLs provides a mock function with given fields: ctx, userid
+func (_m *Storage) ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error) {
+	ret := _m.Called(ctx, userid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListUserURLs")
@@ -169,10 +169,10 @@ func (_m *Storage) ListUserURLs(ctx context.Context, uid string) ([]*storage.URL
 	var r0 []*storage.URL
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) ([]*storage.URL, error)); ok {
-		return rf(ctx, uid)
+		return rf(ctx, userid)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) []*storage.URL); ok {
-		r0 = rf(ctx, uid)
+		r0 = rf(ctx, userid)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*storage.URL)
@@ -180,7 +180,7 @@ func (_m *Storage) ListUserURLs(ctx context.Context, uid string) ([]*storage.URL
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, uid)
+		r1 = rf(ctx, userid)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -195,12 +195,12 @@ type Storage_ListUserURLs_Call struct {
 
 // ListUserURLs is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uid string
-func (_e *Storage_Expecter) ListUserURLs(ctx interface{}, uid interface{}) *Storage_ListUserURLs_Call {
-	return &Storage_ListUserURLs_Call{Call: _e.mock.On("ListUserURLs", ctx, uid)}
+//   - userid string
+func (_e *Storage_Expecter) ListUserURLs(ctx interface{}, userid interface{}) *Storage_ListUserURLs_Call {
+	return &Storage_ListUserURLs_Call{Call: _e.mock.On("ListUserURLs", ctx, userid)}
 }
 
-func (_c *Storage_ListUserURLs_Call) Run(run func(ctx context.Context, uid string)) *Storage_ListUserURLs_Call {
+func (_c *Storage_ListUserURLs_Call) Run(run func(ctx context.Context, userid string)) *Storage_ListUserURLs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})

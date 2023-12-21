@@ -18,7 +18,7 @@ const (
 
 type Claims struct {
 	jwt.RegisteredClaims
-	UID string
+	UserID string
 }
 
 type Auth struct {
@@ -35,10 +35,10 @@ func (a *Auth) GetUser(r *http.Request) (*user.User, error) {
 		return nil, fmt.Errorf("cannot get user from cookies: %w", err)
 	}
 
-	return a.GetUserFromJWT(sessionCookie.Value)
+	return a.getUserFromJWT(sessionCookie.Value)
 }
 
-func (a *Auth) GetUserFromJWT(signedToken string) (*user.User, error) {
+func (a *Auth) getUserFromJWT(signedToken string) (*user.User, error) {
 	token, err := jwt.ParseWithClaims(signedToken, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -51,18 +51,21 @@ func (a *Auth) GetUserFromJWT(signedToken string) (*user.User, error) {
 	if !token.Valid {
 		return nil, errors.New("token is not valid")
 	}
-
-	if claims, ok := token.Claims.(*Claims); !ok {
-		return nil, errors.New("token does not contain claims")
-	} else if claims.UID == "" {
-		return nil, errors.New("uid claim is empty")
-	} else {
-		return user.NewWithID(claims.UID), nil
+	claims, ok := token.Claims.(*Claims)
+	switch {
+	case !ok:
+		return nil, errors.New("token does not have claims")
+	case claims.ExpiresAt.Before(time.Now()):
+		return nil, errors.New("token expired")
+	case claims.UserID == "":
+		return nil, errors.New("user id is empty")
+	default:
+		return user.NewWithID(claims.UserID), nil
 	}
 }
 
 func (a *Auth) CreateJWTCookie(u *user.User) (*http.Cookie, error) {
-	token, err := a.NewToken(u)
+	token, err := a.newToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create auth token: %w", err)
 	}
@@ -72,12 +75,12 @@ func (a *Auth) CreateJWTCookie(u *user.User) (*http.Cookie, error) {
 	}, nil
 }
 
-func (a *Auth) NewToken(u *user.User) (string, error) {
+func (a *Auth) newToken(u *user.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(defaultJWTCookieExpiration)),
 		},
-		UID: u.ID,
+		UserID: u.ID,
 	})
 
 	signedToken, err := token.SignedString([]byte(a.jwtSecret))

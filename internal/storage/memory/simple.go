@@ -58,21 +58,21 @@ func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (str
 		UUID:        u.String(),
 		ShortURL:    url.Short,
 		OriginalURL: url.Orig,
-		UID:         url.UID,
+		UserID:      url.UserID,
 	}
 	return "", nil
 }
 
-func (m *Memory) ListUserURLs(_ context.Context, uid string) ([]*storage.URL, error) {
+func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	var urls []*storage.URL
 	for _, record := range m.DB {
-		if record.UID == uid {
+		if record.UserID == userID {
 			urls = append(urls, &storage.URL{
-				Short: record.ShortURL,
-				Orig:  record.OriginalURL,
-				UID:   uid,
+				Short:  record.ShortURL,
+				Orig:   record.OriginalURL,
+				UserID: userID,
 			})
 		}
 	}
@@ -85,7 +85,7 @@ func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) error {
 
 	for _, url := range urls {
 		if record, ok := m.DB[url.Short]; ok {
-			if record.UID == url.UID {
+			if record.UserID == url.UserID {
 				record.Deleted = true
 				m.DB[url.Short] = record
 			}
@@ -113,7 +113,7 @@ func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 			UUID:        IDs[i],
 			ShortURL:    url.Short,
 			OriginalURL: url.Orig,
-			UID:         url.UID,
+			UserID:      url.UserID,
 		}
 	}
 	return nil
