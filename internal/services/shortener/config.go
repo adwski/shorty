@@ -1,9 +1,10 @@
 package shortener
 
 import (
+	"time"
+
 	"github.com/adwski/shorty/internal/buffer"
 	"go.uber.org/zap"
-	"time"
 )
 
 const (
