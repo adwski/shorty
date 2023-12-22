@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 
 	authorizer "github.com/adwski/shorty/internal/auth"
@@ -23,35 +24,45 @@ func New(logger *zap.Logger, jwtSecret string) *Middleware {
 }
 
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	requestID := r.Header.Get("X-Request-ID")
+	requestID, ok := session.GetRequestID(r.Context())
+	if !ok {
+		mw.log.Error("cannot get request id from context")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	logf := mw.log.With(zap.String("id", requestID))
 
 	u, err := mw.GetUser(r)
 	if err != nil {
+		logf.Debug("cannot get session from cookie", zap.Error(err))
 		// Missing or invalid session cookie
 		// Generate a new user
-		logf.Debug("cannot get session from cookie", zap.Error(err))
-		u, err = user.New()
-		if err != nil {
-			// we're helpless here
-			logf.Debug("cannot create new user", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// Set Cookie for new user
-		sessionCookie, errS := mw.CreateJWTCookie(u)
-		if errS != nil {
-			logf.Debug("cannot create session cookie for user", zap.Error(errS))
+		var sessionCookie *http.Cookie
+		if u, sessionCookie, err = mw.getUserAndCookie(); err != nil {
+			logf.Error("cannot create user session", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Set-Cookie", sessionCookie.String())
 	}
 
-	u.SetRequestID(requestID)
 	// Call next handler with user context
 	mw.handler.ServeHTTP(w, r.WithContext(session.SetUserContext(r.Context(), u)))
+}
+
+func (mw *Middleware) getUserAndCookie() (*user.User, *http.Cookie, error) {
+	// Create user with unique ID
+	u, err := user.New()
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create new user: %w", err)
+	}
+
+	// Set Cookie for new user
+	sessionCookie, errS := mw.CreateJWTCookie(u)
+	if errS != nil {
+		return nil, nil, fmt.Errorf("cannot create session cookie for user: %w", errS)
+	}
+	return u, sessionCookie, nil
 }
 
 func (mw *Middleware) HandleFunc(h http.Handler) http.Handler {

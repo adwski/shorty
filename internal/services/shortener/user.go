@@ -19,13 +19,13 @@ type DeleteResponse struct {
 }
 
 func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
-	u, ok := session.GetUserFromContext(r.Context())
-	if !ok {
+	u, reqID, err := session.GetUserAndReqID(r.Context())
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error(ErrNoUser.Error())
+		svc.log.Error(ErrRequestCtxMsg, zap.Error(err))
 		return
 	}
-	logf := svc.log.With(zap.String("id", u.GetRequestID()))
+	logf := svc.log.With(zap.String("id", reqID))
 
 	if u.IsNew() {
 		logf.Debug("unauthorized delete call")
@@ -48,10 +48,14 @@ func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 
 	ts := time.Now().UnixMicro()
 	for _, short := range shorts {
-		svc.delURLs <- storage.URL{
+		if err = svc.flusher.Push(storage.URL{
 			Short:  short,
 			UserID: u.ID,
 			TS:     ts,
+		}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			svc.log.Debug("cannot send url for deletion", zap.Error(err))
+			return
 		}
 		svc.log.Debug("sending url for deletion",
 			zap.String("short", short),
@@ -72,13 +76,13 @@ func (svc *Service) deleteURLs(ctx context.Context, urls []storage.URL) {
 }
 
 func (svc *Service) GetURLs(w http.ResponseWriter, r *http.Request) {
-	u, ok := session.GetUserFromContext(r.Context())
-	if !ok {
+	u, reqID, err := session.GetUserAndReqID(r.Context())
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error(ErrNoUser.Error())
+		svc.log.Error(ErrRequestCtxMsg, zap.Error(err))
 		return
 	}
-	logf := svc.log.With(zap.String("id", u.GetRequestID()))
+	logf := svc.log.With(zap.String("id", reqID))
 
 	if u.IsNew() {
 		// Session was created during this request
@@ -87,14 +91,14 @@ func (svc *Service) GetURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	urls, err := svc.store.ListUserURLs(r.Context(), u.ID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+	urls, errU := svc.store.ListUserURLs(r.Context(), u.ID)
+	if errU != nil {
+		if errors.Is(errU, storage.ErrNotFound) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		w.WriteHeader(http.StatusInternalServerError)
-		logf.Error("storage error", zap.Error(err))
+		logf.Error("storage error", zap.Error(errU))
 		return
 	}
 

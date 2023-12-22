@@ -74,7 +74,8 @@ func TestService_ShortenBatch(t *testing.T) {
 			body, err := json.Marshal(tt.args.batch)
 			require.NoError(t, err)
 			r := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
-			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "test"}))
+			r = r.WithContext(session.SetRequestID(r.Context(), "testreqest"))
+			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "testuser"}))
 			r.Header.Set("Content-Type", "application/json")
 
 			// Do request

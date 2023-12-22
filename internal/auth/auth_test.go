@@ -21,7 +21,7 @@ func TestAuth_CreateJWTCookie(t *testing.T) {
 		{
 			name: "create jwt cookie",
 			args: args{
-				u:         &user.User{ID: "bO64vpYQQpq3LlQRovQmlA"},
+				u:         &user.User{ID: "tdGk2USqTvWW8jyz7HnhlA"},
 				jwtSecret: "super-secret",
 			},
 		},
@@ -51,7 +51,7 @@ func TestAuth_GetUser(t *testing.T) {
 		{
 			name: "create jwt cookie",
 			args: args{
-				u:         &user.User{ID: "bO64vpYQQpq3LlQRovQmlA"},
+				u:         &user.User{ID: "tdGk2USqTvWW8jyz7HnhlA"},
 				jwtSecret: "super-secret",
 			},
 		},

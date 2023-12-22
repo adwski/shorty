@@ -25,7 +25,7 @@ const (
 	defaultStoreRetries = 3
 )
 
-var ErrNoUser = errors.New("middleware did not provide user context")
+var ErrRequestCtxMsg = "request context error"
 
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
@@ -39,7 +39,6 @@ type Storage interface {
 type Service struct {
 	store          Storage
 	flusher        *buffer.Flusher[storage.URL]
-	delURLs        chan storage.URL
 	log            *zap.Logger
 	servedScheme   string
 	redirectScheme string

@@ -7,6 +7,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/adwski/shorty/internal/session"
+
 	"go.uber.org/zap"
 )
 
@@ -82,8 +84,8 @@ func (mw *Middleware) Chain(h http.Handler) *Middleware {
 
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
-		start = time.Now()
-		reqID = r.Header.Get("X-Request-ID")
+		start    = time.Now()
+		reqID, _ = session.GetRequestID(r.Context())
 	)
 
 	mw.log.Info("request",

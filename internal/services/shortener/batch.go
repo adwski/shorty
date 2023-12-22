@@ -29,41 +29,38 @@ type BatchShortened struct {
 
 // ShortenBatch shortens batch of urls.
 func (svc *Service) ShortenBatch(w http.ResponseWriter, req *http.Request) {
-	u, ok := session.GetUserFromContext(req.Context())
-	if !ok {
+	u, reqID, err := session.GetUserAndReqID(req.Context())
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error(ErrNoUser.Error())
+		svc.log.Error(ErrRequestCtxMsg, zap.Error(err))
 		return
 	}
-	logf := svc.log.With(zap.String("id", u.GetRequestID()))
+	logf := svc.log.With(zap.String("id", reqID))
 
-	var (
-		batchURLs   []BatchURL
-		shortURLs   []BatchShortened
-		shortenResp []byte
-		err         error
-	)
 	if err = validate.ShortenRequestJSON(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		logf.Error("shorten request is not valid", zap.Error(err))
 		return
 	}
 
-	if batchURLs, err = getURLBatchFromJSONBody(req); err != nil {
+	batchURLs, errB := getURLBatchFromJSONBody(req)
+	if errB != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		logf.Error("cannot get url batch from request body", zap.Error(err))
+		logf.Error("cannot get url batch from request body", zap.Error(errB))
 		return
 	}
 
-	if shortURLs, err = svc.shortenBatch(req.Context(), u, batchURLs); err != nil {
+	shortURLs, errS := svc.shortenBatch(req.Context(), u, batchURLs)
+	if errS != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		logf.Error("cannot store url batch", zap.Error(err))
+		logf.Error("cannot store url batch", zap.Error(errS))
 		return
 	}
 
-	if shortenResp, err = json.Marshal(&shortURLs); err != nil {
+	shortenResp, errR := json.Marshal(&shortURLs)
+	if errR != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		logf.Error("cannot marshall response", zap.Error(err))
+		logf.Error("cannot marshall response", zap.Error(errR))
 		return
 	}
 

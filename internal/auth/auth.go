@@ -18,7 +18,7 @@ const (
 
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID string
+	UserID string `json:"user_id,omitempty"`
 }
 
 type Auth struct {

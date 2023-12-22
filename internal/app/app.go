@@ -69,7 +69,7 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 		Logger:  logger,
 	})
 
-	r := getRouterWithMiddleware(logger, cfg.GenerateReqID)
+	r := getRouterWithMiddleware(logger, cfg.TrustRequestID)
 	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
 		r.Get("/api/user/urls", shortenerSvc.GetURLs)
 		r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
@@ -96,12 +96,12 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 	}
 }
 
-func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) chi.Router {
+func getRouterWithMiddleware(logger *zap.Logger, trustRequestID bool) chi.Router {
 	router := chi.NewRouter()
 	router.Use(
 		requestid.New(&requestid.Config{
-			Generate: genReqID,
-			Logger:   logger,
+			Trust:  trustRequestID,
+			Logger: logger,
 		}).HandlerFunc,
 		logging.New(&logging.Config{
 			Logger: logger,

@@ -171,7 +171,8 @@ func TestService_Shorten(t *testing.T) {
 			}
 
 			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(body))
-			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "test"}))
+			r = r.WithContext(session.SetRequestID(r.Context(), "testreqest"))
+			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "testuser"}))
 			for k, v := range tt.args.headers {
 				r.Header.Set(k, v)
 			}

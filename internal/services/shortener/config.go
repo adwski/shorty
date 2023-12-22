@@ -34,7 +34,7 @@ func New(cfg *Config) *Service {
 		log:            logger,
 	}
 
-	svc.flusher, svc.delURLs = buffer.NewFlusher(&buffer.FlusherConfig{
+	svc.flusher = buffer.NewFlusher(&buffer.FlusherConfig{
 		Logger:        cfg.Logger,
 		FlushInterval: flusherFlushInterval,
 		FlushSize:     flusherFillSize,

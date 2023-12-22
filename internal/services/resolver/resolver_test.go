@@ -1,11 +1,14 @@
 package resolver
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
+
+	"github.com/adwski/shorty/internal/session"
 
 	"github.com/adwski/shorty/internal/app/mockapp"
 
@@ -103,14 +106,13 @@ func TestService_Redirect(t *testing.T) {
 			require.NoError(t, err)
 
 			st := mockapp.NewStorage(t)
-			ctx := context.Background()
 
 			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {
 				if !tt.args.invalid {
-					st.EXPECT().Get(ctx, tt.args.shortURL).Return("", storage.ErrNotFound)
+					st.EXPECT().Get(mock.Anything, tt.args.shortURL).Return("", storage.ErrNotFound)
 				}
 			} else {
-				st.EXPECT().Get(ctx, tt.args.shortURL).Return(v, nil)
+				st.EXPECT().Get(mock.Anything, tt.args.shortURL).Return(v, nil)
 			}
 
 			svc := &Service{
@@ -119,6 +121,7 @@ func TestService_Redirect(t *testing.T) {
 			}
 
 			r := httptest.NewRequest(http.MethodGet, "/"+tt.args.shortURL, nil)
+			r = r.WithContext(session.SetRequestID(r.Context(), "test-request"))
 			w := httptest.NewRecorder()
 			svc.Resolve(w, r)
 

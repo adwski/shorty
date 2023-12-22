@@ -44,7 +44,7 @@ func TestMiddleware(t *testing.T) {
 		},
 		{
 			name: "auth with cookie",
-			args: args{user: &user.User{ID: "bO64vpYQQpq3LlQRovQmlA"}},
+			args: args{user: &user.User{ID: "tdGk2USqTvWW8jyz7HnhlA"}},
 			want: want{cookie: false},
 		},
 	}
@@ -56,11 +56,12 @@ func TestMiddleware(t *testing.T) {
 			mw := New(logger, secret)
 
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r = r.WithContext(session.SetRequestID(r.Context(), "test-request"))
 
 			if tt.args.user != nil {
 				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-					"exp":    jwt.NewNumericDate(time.Now().Add(time.Hour)),
-					"UserID": tt.args.user.ID,
+					"exp":     jwt.NewNumericDate(time.Now().Add(time.Hour)),
+					"user_id": tt.args.user.ID,
 				})
 				signedToken, errS := token.SignedString([]byte(secret))
 				require.NoError(t, errS)
@@ -90,7 +91,7 @@ func TestMiddleware(t *testing.T) {
 					return []byte(secret), nil
 				})
 				require.NoError(t, errT)
-				assert.NotEmpty(t, token.Claims.(jwt.MapClaims)["UserID"])
+				assert.NotEmpty(t, token.Claims.(jwt.MapClaims)["user_id"])
 			} else {
 				require.Equal(t, 0, len(resp.Cookies()))
 				assert.Equal(t, tt.args.user.ID, s.u.ID)

@@ -14,7 +14,7 @@ type Shorty struct {
 	RedirectScheme string
 	ServedScheme   string
 	JWTSecret      string
-	GenerateReqID  bool
+	TrustRequestID bool
 }
 
 type Storage struct {
@@ -62,7 +62,7 @@ func New() (*Shorty, error) {
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
 		JWTSecret:      *jwtSecret,
-		GenerateReqID:  !*trustRequestID,
+		TrustRequestID: *trustRequestID,
 		StorageConfig: &Storage{
 			TraceDB:         *traceDB,
 			DatabaseDSN:     *databaseDSN,
