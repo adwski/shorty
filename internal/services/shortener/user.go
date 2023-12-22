@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/adwski/shorty/internal/session"
 	"github.com/adwski/shorty/internal/storage"
@@ -45,20 +46,25 @@ func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts := time.Now().UnixMilli()
 	for _, short := range shorts {
 		svc.delURLs <- storage.URL{
 			Short:  short,
 			UserID: u.ID,
+			TS:     ts,
 		}
 	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
 func (svc *Service) deleteURLs(ctx context.Context, urls []storage.URL) {
-	if err := svc.store.DeleteUserURLs(ctx, urls); err != nil {
+	affected, err := svc.store.DeleteUserURLs(ctx, urls)
+	if err != nil {
 		svc.log.Error("storage error during batch deletion", zap.Error(err))
+		return
 	}
-	svc.log.Debug("batch delete completed successfully")
+	svc.log.Debug("batch delete completed successfully",
+		zap.Int64("affected", affected))
 }
 
 func (svc *Service) GetURLs(w http.ResponseWriter, r *http.Request) {

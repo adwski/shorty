@@ -15,6 +15,13 @@ build:
 # > make shortenertest TESTNUM=7
 .PHONY: shortenertest
 shortenertest: build
+		shortenertestbeta -test.v -test.run=^TestIteration$$TESTNUM$$ \
+                      -binary-path=cmd/shortener/shortener \
+                      -source-path=. \
+                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty?sslmode=disable'
+
+.PHONY: shortenertests
+shortenertests: build
 	for num in 1 2 3 4 5 6 7 8 9; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
@@ -42,7 +49,7 @@ goimports:
 	goimports -w  .
 
 .PHONY: test
-test: mock goimports lint unittests statictest shortenertest
+test: mock goimports lint unittests statictest shortenertests
 
 .PHONY: integration-tests
 integration-tests: docker-dev

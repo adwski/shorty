@@ -55,21 +55,31 @@ func (_c *Storage_Close_Call) RunAndReturn(run func()) *Storage_Close_Call {
 }
 
 // DeleteUserURLs provides a mock function with given fields: ctx, urls
-func (_m *Storage) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
+func (_m *Storage) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
 	ret := _m.Called(ctx, urls)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUserURLs")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []storage.URL) error); ok {
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []storage.URL) (int64, error)); ok {
+		return rf(ctx, urls)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []storage.URL) int64); ok {
 		r0 = rf(ctx, urls)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, []storage.URL) error); ok {
+		r1 = rf(ctx, urls)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Storage_DeleteUserURLs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserURLs'
@@ -91,12 +101,12 @@ func (_c *Storage_DeleteUserURLs_Call) Run(run func(ctx context.Context, urls []
 	return _c
 }
 
-func (_c *Storage_DeleteUserURLs_Call) Return(_a0 error) *Storage_DeleteUserURLs_Call {
-	_c.Call.Return(_a0)
+func (_c *Storage_DeleteUserURLs_Call) Return(_a0 int64, _a1 error) *Storage_DeleteUserURLs_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *Storage_DeleteUserURLs_Call) RunAndReturn(run func(context.Context, []storage.URL) error) *Storage_DeleteUserURLs_Call {
+func (_c *Storage_DeleteUserURLs_Call) RunAndReturn(run func(context.Context, []storage.URL) (int64, error)) *Storage_DeleteUserURLs_Call {
 	_c.Call.Return(run)
 	return _c
 }

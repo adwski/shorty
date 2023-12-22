@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/jackc/pgerrcode"
@@ -47,9 +48,16 @@ func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool)
 		return db.storeWithOverwrite(ctx, url)
 	}
 
+	// Cleanup deleted urls on Orig collision
+	// I wasn't able to do this together with INSERT in one statement
+	// (considering all other corner cases)
+	if err := db.cleanupDeletedOrig(ctx, url.Orig); err != nil {
+		return "", err
+	}
+
+	// insert new url
 	query := `insert into urls(hash, orig, userid) values ($1,$2,$3)`
 	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig, url.UserID)
-
 	if err == nil {
 		if tag.RowsAffected() != 1 {
 			return "", fmt.Errorf("affected rows: %d, expected: 1", tag.RowsAffected())
@@ -74,6 +82,24 @@ func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool)
 		}
 	}
 	return "", fmt.Errorf("postgres error: %w", err)
+}
+
+func (db *Database) cleanupDeletedOrig(ctx context.Context, orig string) error {
+	query := `delete from urls where orig = $1 and deleted returning hash, userid`
+	var (
+		hash, userID string
+	)
+	err := db.pool.QueryRow(ctx, query, orig).Scan(&hash, &userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("postgres error: %w", err)
+	}
+	db.log.Debug("url was deleted on orig collision",
+		zap.String("hash", hash),
+		zap.String("userID", userID))
+	return nil
 }
 
 func (db *Database) storeWithOverwrite(ctx context.Context, url *storage.URL) (string, error) {
@@ -167,15 +193,30 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 	return urls, nil
 }
 
-func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
-	batch := &pgx.Batch{}
+func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
+	var (
+		batch    = &pgx.Batch{}
+		ts       = time.Now().UnixMilli()
+		affected int64
+	)
 	for _, url := range urls {
-		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 `, url.Short, url.UserID)
+		if url.TS == 0 {
+			db.log.Warn("deletion timestamp was not set, assuming now()",
+				zap.String("hash", url.Short),
+				zap.String("userID", url.UserID))
+		} else {
+			ts = url.TS
+		}
+		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 and ts < to_timestamp($3 / 1000.0)`,
+			url.Short, url.UserID, ts).Exec(func(ct pgconn.CommandTag) error {
+			affected += ct.RowsAffected()
+			return nil
+		})
 	}
 	if err := db.pool.SendBatch(ctx, batch).Close(); err != nil {
-		return fmt.Errorf("pgx batch delete error: %w", err)
+		return 0, fmt.Errorf("pgx batch delete error: %w", err)
 	}
-	return nil
+	return affected, nil
 }
 
 func (db *Database) getHashByURL(ctx context.Context, url string) (hash string, err error) {

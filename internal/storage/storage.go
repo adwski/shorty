@@ -13,4 +13,5 @@ type URL struct {
 	Short  string `json:"short_url"`
 	Orig   string `json:"original_url"`
 	UserID string `json:"-"`
+	TS     int64  `json:"-"`
 }

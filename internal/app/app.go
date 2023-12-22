@@ -35,7 +35,7 @@ type Storage interface {
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
 	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
-	DeleteUserURLs(ctx context.Context, urls []storage.URL) error
+	DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error)
 	Ping(ctx context.Context) error
 	Close()
 }

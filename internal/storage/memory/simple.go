@@ -79,19 +79,20 @@ func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL,
 	return urls, nil
 }
 
-func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) error {
+func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-
+	var num int64
 	for _, url := range urls {
 		if record, ok := m.DB[url.Short]; ok {
 			if record.UserID == url.UserID {
 				record.Deleted = true
 				m.DB[url.Short] = record
+				num++
 			}
 		}
 	}
-	return nil
+	return num, nil
 }
 
 func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {

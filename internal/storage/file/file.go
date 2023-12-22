@@ -118,15 +118,16 @@ func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	return nil
 }
 
-func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) error {
+func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
 	if s.shutdown.Load() {
-		return errors.New("storage is shutting down")
+		return 0, errors.New("storage is shutting down")
 	}
-	if err := s.Memory.DeleteUserURLs(ctx, urls); err != nil {
-		return fmt.Errorf("memory storage error: %w", err)
+	affected, err := s.Memory.DeleteUserURLs(ctx, urls)
+	if err != nil {
+		return 0, fmt.Errorf("memory storage error: %w", err)
 	}
 	s.changed.Store(true)
-	return nil
+	return affected, nil
 }
 
 func (s *File) maintainPersistence(ctx context.Context) {
