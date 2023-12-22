@@ -53,6 +53,10 @@ func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 			UserID: u.ID,
 			TS:     ts,
 		}
+		svc.log.Debug("sending url for deletion",
+			zap.String("short", short),
+			zap.String("userID", u.ID),
+			zap.Int64("ts", ts))
 	}
 	w.WriteHeader(http.StatusAccepted)
 }

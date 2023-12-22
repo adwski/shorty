@@ -207,6 +207,13 @@ func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int
 		} else {
 			ts = url.TS
 		}
+
+		db.log.Debug("deleting url",
+			zap.String("hash", url.Short),
+			zap.String("userid", url.UserID),
+			zap.String("orig", url.Orig),
+			zap.Int64("ts", ts))
+
 		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 and ts < to_timestamp($3 / 1000000.0)`,
 			url.Short, url.UserID, ts).Exec(func(ct pgconn.CommandTag) error {
 			affected += ct.RowsAffected()
