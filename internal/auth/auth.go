@@ -55,6 +55,8 @@ func (a *Auth) getUserFromJWT(signedToken string) (*user.User, error) {
 	switch {
 	case !ok:
 		return nil, errors.New("token does not have claims")
+	case claims.ExpiresAt == nil:
+		return nil, errors.New("expiration claim is missing")
 	case claims.ExpiresAt.Before(time.Now()):
 		return nil, errors.New("token expired")
 	case claims.UserID == "":
