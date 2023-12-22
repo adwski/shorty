@@ -13,7 +13,7 @@ import (
 type Flusher[T any] struct {
 	log           *zap.Logger
 	shutdown      *atomic.Bool
-	in            chan T
+	fillChan      chan struct{}
 	flush         func(context.Context, []T)
 	buf           []T
 	size          int
@@ -31,8 +31,8 @@ type FlusherConfig struct {
 func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Flusher[T] {
 	return &Flusher[T]{
 		log:           cfg.Logger.With(zap.String("component", "flusher")),
-		in:            make(chan T),
 		flush:         flush,
+		fillChan:      make(chan struct{}),
 		buf:           make([]T, 0, cfg.AllocSize),
 		flushInterval: cfg.FlushInterval,
 		flushSize:     cfg.FlushSize,
@@ -44,7 +44,11 @@ func (s *Flusher[T]) Push(elem T) error {
 	if s.shutdown.Load() {
 		return errors.New("flusher is shutting down")
 	}
-	s.in <- elem
+	s.size++
+	s.buf = append(s.buf, elem)
+	if len(s.buf) >= s.flushSize {
+		s.fillChan <- struct{}{}
+	}
 	return nil
 }
 
@@ -65,10 +69,8 @@ func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 
 	for {
 		select {
-		case record := <-s.in:
-			s.size++
-			s.buf = append(s.buf, record)
-			if len(s.buf) >= s.flushSize {
+		case <-s.fillChan:
+			if len(s.buf) > 0 {
 				s.log.Debug("flushing on buffer fill")
 				s.doFlush(ctx)
 			}
