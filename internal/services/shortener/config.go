@@ -3,6 +3,13 @@ package shortener
 import (
 	"github.com/adwski/shorty/internal/buffer"
 	"go.uber.org/zap"
+	"time"
+)
+
+const (
+	flusherFillSize      = 10
+	flusherAllocSize     = 20
+	flusherFlushInterval = 5 * time.Second
 )
 
 type Config struct {
@@ -26,6 +33,11 @@ func New(cfg *Config) *Service {
 		log:            logger,
 	}
 
-	svc.flusher, svc.delURLs = buffer.NewFlusher(cfg.Logger, svc.deleteURLs)
+	svc.flusher, svc.delURLs = buffer.NewFlusher(&buffer.FlusherConfig{
+		Logger:        cfg.Logger,
+		FlushInterval: flusherFlushInterval,
+		FlushSize:     flusherFillSize,
+		AllocSize:     flusherAllocSize,
+	}, svc.deleteURLs)
 	return svc
 }

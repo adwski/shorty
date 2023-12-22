@@ -8,27 +8,32 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	bufFillSize      = 10
-	bufAllocSize     = 20
-	bufFlushInterval = 5 * time.Second
-)
-
 type Flusher[T any] struct {
-	log   *zap.Logger
-	in    chan T
-	flush func(context.Context, []T)
-	buf   []T
-	size  int
+	log           *zap.Logger
+	in            chan T
+	flush         func(context.Context, []T)
+	buf           []T
+	size          int
+	flushSize     int
+	flushInterval time.Duration
 }
 
-func NewFlusher[T any](log *zap.Logger, flush func(context.Context, []T)) (*Flusher[T], chan T) {
+type FlusherConfig struct {
+	Logger        *zap.Logger
+	FlushInterval time.Duration
+	FlushSize     int
+	AllocSize     int
+}
+
+func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) (*Flusher[T], chan T) {
 	in := make(chan T)
 	return &Flusher[T]{
-		log:   log.With(zap.String("component", "flusher")),
-		in:    in,
-		flush: flush,
-		buf:   make([]T, 0, bufAllocSize),
+		log:           cfg.Logger.With(zap.String("component", "flusher")),
+		in:            in,
+		flush:         flush,
+		buf:           make([]T, 0, cfg.AllocSize),
+		flushInterval: cfg.FlushInterval,
+		flushSize:     cfg.FlushSize,
 	}, in
 }
 
@@ -52,11 +57,11 @@ func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 		case record := <-s.in:
 			s.size++
 			s.buf = append(s.buf, record)
-			if len(s.buf) >= bufFillSize {
+			if len(s.buf) >= s.flushSize {
 				s.log.Debug("flushing on buffer fill")
 				doFlush()
 			}
-		case <-time.After(bufFlushInterval):
+		case <-time.After(s.flushInterval):
 			if len(s.buf) > 0 {
 				s.log.Debug("flushing on time tick")
 				doFlush()
