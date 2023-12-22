@@ -46,7 +46,7 @@ func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts := time.Now().UnixMilli()
+	ts := time.Now().UnixMicro()
 	for _, short := range shorts {
 		svc.delURLs <- storage.URL{
 			Short:  short,

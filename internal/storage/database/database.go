@@ -196,7 +196,7 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
 	var (
 		batch    = &pgx.Batch{}
-		ts       = time.Now().UnixMilli()
+		ts       = time.Now().UnixMicro()
 		affected int64
 	)
 	for _, url := range urls {
@@ -207,7 +207,7 @@ func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int
 		} else {
 			ts = url.TS
 		}
-		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 and ts < to_timestamp($3 / 1000.0)`,
+		batch.Queue(`update urls set deleted = true where hash = $1 and userid = $2 and ts < to_timestamp($3 / 1000000.0)`,
 			url.Short, url.UserID, ts).Exec(func(ct pgconn.CommandTag) error {
 			affected += ct.RowsAffected()
 			return nil
