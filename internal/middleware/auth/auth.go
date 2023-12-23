@@ -38,7 +38,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Missing or invalid session cookie
 		// Generate a new user
 		var sessionCookie *http.Cookie
-		if u, sessionCookie, err = mw.getUserAndCookie(); err != nil {
+		if u, sessionCookie, err = mw.createUserAndCookie(); err != nil {
 			logf.Error("cannot create user session", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -50,7 +50,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mw.handler.ServeHTTP(w, r.WithContext(session.SetUserContext(r.Context(), u)))
 }
 
-func (mw *Middleware) getUserAndCookie() (*user.User, *http.Cookie, error) {
+func (mw *Middleware) createUserAndCookie() (*user.User, *http.Cookie, error) {
 	// Create user with unique ID
 	u, err := user.New()
 	if err != nil {

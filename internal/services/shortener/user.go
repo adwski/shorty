@@ -133,7 +133,6 @@ func getShortsFromJSONBody(r *http.Request) (shorts []string, err error) {
 
 	if len(shorts) == 0 {
 		err = fmt.Errorf("empty short urls list")
-		return
 	}
 	return
 }
