@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -223,7 +225,6 @@ func TestDatabase_StoreBatch(t *testing.T) {
 	type args struct {
 		urlInDB           *storage.URL
 		batch             []storage.URL
-		overwrite         bool
 		cleanupTestHashes bool
 	}
 	type want struct {
@@ -288,6 +289,224 @@ func TestDatabase_StoreBatch(t *testing.T) {
 			// test
 			err := db.StoreBatch(ctx, tt.args.batch)
 			require.Equal(t, tt.want.err, err)
+
+			// clean up
+			if tt.args.cleanupTestHashes {
+				cleanUpTestHashes(ctx, t, db.pool)
+			}
+		})
+	}
+}
+
+func TestDatabase_ListUserURLs(t *testing.T) {
+	type args struct {
+		urlsInDB          []storage.URL
+		userID            string
+		cleanupTestHashes bool
+	}
+	type want struct {
+		err    error
+		hashes []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "list urls",
+			args: args{
+				urlsInDB: []storage.URL{
+					{
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
+					},
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+				userID:            "testuser",
+				cleanupTestHashes: true,
+			},
+			want: want{
+				err:    nil,
+				hashes: []string{"test456"},
+			},
+		},
+		{
+			name: "empty urls",
+			args: args{
+				urlsInDB: []storage.URL{
+					{
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
+					},
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+				userID:            "testuser3",
+				cleanupTestHashes: true,
+			},
+			want: want{
+				err: storage.ErrNotFound,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// prepare data
+			for _, u := range tt.args.urlsInDB {
+				tag, errT := db.pool.Exec(ctx, "insert into urls (hash, orig, userid) values ($1, $2, $3)",
+					u.Short, u.Orig, u.UserID)
+				require.NoError(t, errT)
+				require.Equal(t, int64(1), tag.RowsAffected())
+			}
+
+			// test
+			urls, err := db.ListUserURLs(ctx, tt.args.userID)
+			require.Equal(t, tt.want.err, err)
+
+			if tt.want.err == nil {
+				hashes := tt.want.hashes
+				require.Equal(t, len(tt.want.hashes), len(urls))
+
+				sort.Slice(urls, func(i, j int) bool { return urls[i].Short > urls[j].Short })
+				sort.Slice(hashes, func(i, j int) bool { return hashes[i] > hashes[j] })
+
+				for i, url := range urls {
+					assert.Equal(t, hashes[i], url.Short)
+				}
+			}
+
+			// clean up
+			if tt.args.cleanupTestHashes {
+				cleanUpTestHashes(ctx, t, db.pool)
+			}
+		})
+	}
+}
+
+func TestDatabase_DeleteUserURLs(t *testing.T) {
+	type args struct {
+		urlsInDB          []storage.URL
+		urlsForDeletion   []storage.URL
+		cleanupTestHashes bool
+	}
+	type want struct {
+		err        error
+		affected   int64
+		urlsRemain []storage.URL
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "delete url",
+			args: args{
+				urlsInDB: []storage.URL{
+					{
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
+					},
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+				urlsForDeletion: []storage.URL{
+					{
+						Short:  "test456",
+						UserID: "testuser",
+					},
+				},
+				cleanupTestHashes: true,
+			},
+			want: want{
+				affected: 1,
+				urlsRemain: []storage.URL{
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+			},
+		},
+		{
+			name: "delete not existing urls",
+			args: args{
+				urlsInDB: []storage.URL{
+					{
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
+					},
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+				urlsForDeletion: []storage.URL{
+					{
+						Short:  "test4567",
+						UserID: "testuser3",
+					},
+				},
+				cleanupTestHashes: true,
+			},
+			want: want{
+				affected: 0,
+				urlsRemain: []storage.URL{
+					{
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
+					},
+					{
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser2",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// prepare data
+			for _, u := range tt.args.urlsInDB {
+				tag, errT := db.pool.Exec(ctx, "insert into urls (hash, orig, userid) values ($1, $2, $3)",
+					u.Short, u.Orig, u.UserID)
+				require.NoError(t, errT)
+				require.Equal(t, int64(1), tag.RowsAffected())
+			}
+			<-time.After(time.Second) // allow some delay to ensure timestamp differences on deletion
+			// test
+			affected, err := db.DeleteUserURLs(ctx, tt.args.urlsForDeletion)
+			require.Equal(t, tt.want.err, err)
+			require.Equal(t, tt.want.affected, affected)
+
+			for _, url := range tt.want.urlsRemain {
+				orig, errU := db.Get(ctx, url.Short)
+				require.NoError(t, errU)
+				assert.Equal(t, url.Orig, orig)
+			}
 
 			// clean up
 			if tt.args.cleanupTestHashes {

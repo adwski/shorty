@@ -174,13 +174,11 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 		err = storage.ErrNotFound
 		return nil, err
 	}
-	db.log.Debug("executing query",
-		zap.String("userID", userID),
-		zap.Int64("affected", rows.CommandTag().RowsAffected()))
+	db.log.Debug("listing urls for user",
+		zap.String("userID", userID))
 	// Use generic CollectRows()
 	// https://youtu.be/sXMSWhcHCf8?t=995
 	urls, errR := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*storage.URL, error) {
-		db.log.Debug("scanning one row")
 		var url storage.URL
 		if errS := row.Scan(&url.Short, &url.Orig); errS != nil {
 			return nil, fmt.Errorf("error while scanning row: %w", errS)
@@ -189,6 +187,9 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 	})
 	if errR != nil {
 		return nil, fmt.Errorf("error while collecting rows: %w", errR)
+	}
+	if len(urls) == 0 {
+		return nil, storage.ErrNotFound
 	}
 	return urls, nil
 }
