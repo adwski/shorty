@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	flusherFillSize      = 10
-	flusherAllocSize     = 20
-	flusherFlushInterval = 5 * time.Second
+	flusherFillSize      = 100
+	flusherAllocSize     = 200
+	flusherFlushInterval = 3 * time.Second
 )
 
 type Config struct {

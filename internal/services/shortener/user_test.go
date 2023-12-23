@@ -90,8 +90,8 @@ func TestService_DeleteURLs(t *testing.T) {
 					FlushSize:     10,
 					AllocSize:     20,
 				}, func(ctx context.Context, urls []storage.URL) {
-					for _, url := range urls {
-						deletedURLS[url.Short] = url
+					for _, u := range urls {
+						deletedURLS[u.Short] = u
 					}
 				})
 				svc = &Service{
@@ -127,8 +127,8 @@ func TestService_DeleteURLs(t *testing.T) {
 			assert.Equal(t, tt.want.status, res.StatusCode)
 
 			// Check body
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
+			resBody, errB := io.ReadAll(res.Body)
+			require.NoError(t, errB)
 			require.NoError(t, res.Body.Close())
 			require.Len(t, resBody, 0)
 

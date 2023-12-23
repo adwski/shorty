@@ -15,6 +15,7 @@ type Flusher[T any] struct {
 	shutdown      *atomic.Bool
 	fillChan      chan struct{}
 	flush         func(context.Context, []T)
+	bufMux        *sync.Mutex
 	buf           []T
 	size          int
 	flushSize     int
@@ -32,8 +33,9 @@ func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Fl
 	return &Flusher[T]{
 		log:           cfg.Logger.With(zap.String("component", "flusher")),
 		flush:         flush,
-		fillChan:      make(chan struct{}),
+		fillChan:      make(chan struct{}, 1),
 		buf:           make([]T, 0, cfg.AllocSize),
+		bufMux:        &sync.Mutex{},
 		flushInterval: cfg.FlushInterval,
 		flushSize:     cfg.FlushSize,
 		shutdown:      &atomic.Bool{},
@@ -44,6 +46,8 @@ func (s *Flusher[T]) Push(elem T) error {
 	if s.shutdown.Load() {
 		return errors.New("flusher is shutting down")
 	}
+	s.bufMux.Lock()
+	defer s.bufMux.Unlock()
 	s.size++
 	s.buf = append(s.buf, elem)
 	if len(s.buf) >= s.flushSize {
@@ -53,10 +57,15 @@ func (s *Flusher[T]) Push(elem T) error {
 }
 
 func (s *Flusher[T]) doFlush(ctx context.Context) {
-	flushed := make([]T, len(s.buf))
-	copy(flushed, s.buf)
-	s.buf = s.buf[0:0]
-	s.flush(ctx, flushed)
+	s.bufMux.Lock()
+	defer s.bufMux.Unlock()
+	if len(s.buf) > 0 {
+		s.log.Debug("flushing buffer")
+		flushed := make([]T, len(s.buf))
+		copy(flushed, s.buf)
+		s.buf = s.buf[0:0]
+		s.flush(ctx, flushed)
+	}
 }
 
 func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
@@ -70,22 +79,12 @@ func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-s.fillChan:
-			if len(s.buf) > 0 {
-				s.log.Debug("flushing on buffer fill")
-				s.doFlush(ctx)
-			}
 		case <-time.After(s.flushInterval):
-			if len(s.buf) > 0 {
-				s.log.Debug("flushing on time tick")
-				s.doFlush(ctx)
-			}
 		case <-ctx.Done():
 			s.shutdown.Store(true)
-			if len(s.buf) > 0 {
-				s.log.Debug("flushing before shutdown")
-				s.doFlush(ctx)
-			}
+			s.doFlush(ctx)
 			return
 		}
+		s.doFlush(ctx)
 	}
 }
