@@ -49,10 +49,13 @@ goimports:
 	goimports -w  .
 
 .PHONY: test
-test: mock goimports lint unittests statictest shortenertests
+test: mock goimports lint unittests statictest
 
 .PHONY: integration-tests
-integration-tests: docker-dev
+integration-tests: docker-dev db-tests shortenertests
+
+.PHONY: db-tests
+db-tests:
 	go test ./... -v -count=1 -cover --tags=integration -run=TestDatabase*
 
 .PHONY: image-release
