@@ -51,16 +51,24 @@ func TestMain(m *testing.M) {
 		log.Error("error connecting to db", zap.Error(err), zap.String("dsn", externalDBDSN))
 		code = 1
 	} else {
+		cleanUP(ctx, log, db.pool) // clean up here in case some test failed
 		code = m.Run()
 	}
 	defer os.Exit(code)
 }
 
+func cleanUP(ctx context.Context, log *zap.Logger, pool *pgxpool.Pool) {
+	tag, err := pool.Exec(ctx, "delete from urls where hash like 'test%'")
+	if err != nil {
+		panic(err)
+	}
+	log.Debug("cleaned up before tests", zap.Int64("affected", tag.RowsAffected()))
+}
+
 func TestDatabase_Get(t *testing.T) {
 	type args struct {
-		urlInDB           *storage.URL
-		get               string
-		cleanupTestHashes bool
+		urlInDB *storage.URL
+		get     string
 	}
 	type want struct {
 		err error
@@ -78,8 +86,7 @@ func TestDatabase_Get(t *testing.T) {
 					Short: "test123",
 					Orig:  "http://test123.test123/test123",
 				},
-				get:               "test123",
-				cleanupTestHashes: true,
+				get: "test123",
 			},
 			want: want{
 				url: "http://test123.test123/test123",
@@ -113,19 +120,16 @@ func TestDatabase_Get(t *testing.T) {
 			}
 
 			// clean up
-			if tt.args.cleanupTestHashes {
-				cleanUpTestHashes(ctx, t, db.pool)
-			}
+			cleanUpTestHashes(ctx, t, db.pool)
 		})
 	}
 }
 
 func TestDatabase_Store(t *testing.T) {
 	type args struct {
-		urlInDB           *storage.URL
-		storeURL          storage.URL
-		overwrite         bool
-		cleanupTestHashes bool
+		urlInDB   *storage.URL
+		storeURL  storage.URL
+		overwrite bool
 	}
 	type want struct {
 		err  error
@@ -140,39 +144,41 @@ func TestDatabase_Store(t *testing.T) {
 			name: "simple store",
 			args: args{
 				storeURL: storage.URL{
-					Short: "test456",
-					Orig:  "http://test456.test456/test456",
+					Short:  "test456",
+					Orig:   "http://test456.test456/test456",
+					UserID: "testuser",
 				},
-				cleanupTestHashes: true,
 			},
 		},
 		{
 			name: "store same overwrite",
 			args: args{
 				urlInDB: &storage.URL{
-					Short: "test456",
-					Orig:  "http://test456.test456/test456",
+					Short:  "test456",
+					Orig:   "http://test456.test456/test456",
+					UserID: "testuser",
 				},
 				storeURL: storage.URL{
-					Short: "test456",
-					Orig:  "http://test456.test456/test456",
+					Short:  "test456",
+					Orig:   "http://test456.test456/test456",
+					UserID: "testuser",
 				},
-				overwrite:         true,
-				cleanupTestHashes: true,
+				overwrite: true,
 			},
 		},
 		{
 			name: "store same no overwrite",
 			args: args{
 				urlInDB: &storage.URL{
-					Short: "test456",
-					Orig:  "http://test456.test456/test456",
+					Short:  "test456",
+					Orig:   "http://test456.test456/test456",
+					UserID: "testuser",
 				},
 				storeURL: storage.URL{
-					Short: "test456",
-					Orig:  "http://test789.test789/test789",
+					Short:  "test456",
+					Orig:   "http://test789.test789/test789",
+					UserID: "testuser",
 				},
-				cleanupTestHashes: true,
 			},
 			want: want{
 				err: storage.ErrAlreadyExists,
@@ -182,14 +188,15 @@ func TestDatabase_Store(t *testing.T) {
 			name: "store same orig",
 			args: args{
 				urlInDB: &storage.URL{
-					Short: "test789",
-					Orig:  "http://test789.test789/test789",
+					Short:  "test789",
+					Orig:   "http://test789.test789/test789",
+					UserID: "testuser",
 				},
 				storeURL: storage.URL{
-					Short: "test456",
-					Orig:  "http://test789.test789/test789",
+					Short:  "test456",
+					Orig:   "http://test789.test789/test789",
+					UserID: "testuser",
 				},
-				cleanupTestHashes: true,
 			},
 			want: want{
 				err:  storage.ErrConflict,
@@ -214,18 +221,15 @@ func TestDatabase_Store(t *testing.T) {
 			assert.Equal(t, tt.want.hash, hash)
 
 			// clean up
-			if tt.args.cleanupTestHashes {
-				cleanUpTestHashes(ctx, t, db.pool)
-			}
+			cleanUpTestHashes(ctx, t, db.pool)
 		})
 	}
 }
 
 func TestDatabase_StoreBatch(t *testing.T) {
 	type args struct {
-		urlInDB           *storage.URL
-		batch             []storage.URL
-		cleanupTestHashes bool
+		urlInDB *storage.URL
+		batch   []storage.URL
 	}
 	type want struct {
 		err error
@@ -240,35 +244,38 @@ func TestDatabase_StoreBatch(t *testing.T) {
 			args: args{
 				batch: []storage.URL{
 					{
-						Short: "test456",
-						Orig:  "http://test456.test456/test456",
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
 					},
 					{
-						Short: "test789",
-						Orig:  "http://test789.test789/test789",
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser",
 					},
 				},
-				cleanupTestHashes: true,
 			},
 		},
 		{
 			name: "store existing",
 			args: args{
 				urlInDB: &storage.URL{
-					Short: "test456",
-					Orig:  "http://test456.test456/test456",
+					Short:  "test456",
+					Orig:   "http://test456.test456/test456",
+					UserID: "testuser",
 				},
 				batch: []storage.URL{
 					{
-						Short: "test456",
-						Orig:  "http://test456.test456/test456",
+						Short:  "test456",
+						Orig:   "http://test456.test456/test456",
+						UserID: "testuser",
 					},
 					{
-						Short: "test789",
-						Orig:  "http://test789.test789/test789",
+						Short:  "test789",
+						Orig:   "http://test789.test789/test789",
+						UserID: "testuser",
 					},
 				},
-				cleanupTestHashes: true,
 			},
 			want: want{
 				err: storage.ErrAlreadyExists,
@@ -291,18 +298,15 @@ func TestDatabase_StoreBatch(t *testing.T) {
 			require.Equal(t, tt.want.err, err)
 
 			// clean up
-			if tt.args.cleanupTestHashes {
-				cleanUpTestHashes(ctx, t, db.pool)
-			}
+			cleanUpTestHashes(ctx, t, db.pool)
 		})
 	}
 }
 
 func TestDatabase_ListUserURLs(t *testing.T) {
 	type args struct {
-		urlsInDB          []storage.URL
-		userID            string
-		cleanupTestHashes bool
+		urlsInDB []storage.URL
+		userID   string
 	}
 	type want struct {
 		err    error
@@ -328,8 +332,7 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 						UserID: "testuser2",
 					},
 				},
-				userID:            "testuser",
-				cleanupTestHashes: true,
+				userID: "testuser",
 			},
 			want: want{
 				err:    nil,
@@ -351,8 +354,7 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 						UserID: "testuser2",
 					},
 				},
-				userID:            "testuser3",
-				cleanupTestHashes: true,
+				userID: "testuser3",
 			},
 			want: want{
 				err: storage.ErrNotFound,
@@ -388,18 +390,15 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 			}
 
 			// clean up
-			if tt.args.cleanupTestHashes {
-				cleanUpTestHashes(ctx, t, db.pool)
-			}
+			cleanUpTestHashes(ctx, t, db.pool)
 		})
 	}
 }
 
 func TestDatabase_DeleteUserURLs(t *testing.T) {
 	type args struct {
-		urlsInDB          []storage.URL
-		urlsForDeletion   []storage.URL
-		cleanupTestHashes bool
+		urlsInDB        []storage.URL
+		urlsForDeletion []storage.URL
 	}
 	type want struct {
 		err        error
@@ -432,7 +431,6 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 						UserID: "testuser",
 					},
 				},
-				cleanupTestHashes: true,
 			},
 			want: want{
 				affected: 1,
@@ -466,7 +464,6 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 						UserID: "testuser3",
 					},
 				},
-				cleanupTestHashes: true,
 			},
 			want: want{
 				affected: 0,
@@ -509,9 +506,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 			}
 
 			// clean up
-			if tt.args.cleanupTestHashes {
-				cleanUpTestHashes(ctx, t, db.pool)
-			}
+			cleanUpTestHashes(ctx, t, db.pool)
 		})
 	}
 }
