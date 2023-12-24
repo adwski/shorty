@@ -59,13 +59,12 @@ func (s *Flusher[T]) Push(elem T) error {
 func (s *Flusher[T]) doFlush(ctx context.Context) {
 	s.bufMux.Lock()
 	defer s.bufMux.Unlock()
-	if len(s.buf) > 0 {
-		s.log.Debug("flushing buffer")
-		flushed := make([]T, len(s.buf))
-		copy(flushed, s.buf)
-		s.buf = s.buf[0:0]
-		s.flush(ctx, flushed)
+	if len(s.buf) == 0 {
+		return
 	}
+	s.log.Debug("flushing buffer", zap.Int("len", len(s.buf)))
+	s.flush(ctx, s.buf)
+	s.buf = s.buf[0:0]
 }
 
 func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
