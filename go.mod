@@ -3,6 +3,7 @@ module github.com/adwski/shorty
 go 1.21.1
 
 require (
+	github.com/brianvoe/gofakeit/v6 v6.26.3
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/gofrs/uuid/v5 v5.0.0
 	github.com/golang-jwt/jwt/v5 v5.2.0

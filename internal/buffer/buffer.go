@@ -13,6 +13,7 @@ import (
 type Flusher[T any] struct {
 	log           *zap.Logger
 	shutdown      *atomic.Bool
+	flushNeed     *atomic.Bool
 	fillChan      chan struct{}
 	flush         func(context.Context, []T)
 	bufMux        *sync.Mutex
@@ -36,9 +37,10 @@ func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Fl
 		fillChan:      make(chan struct{}, 1),
 		buf:           make([]T, 0, cfg.AllocSize),
 		bufMux:        &sync.Mutex{},
+		shutdown:      &atomic.Bool{},
+		flushNeed:     &atomic.Bool{},
 		flushInterval: cfg.FlushInterval,
 		flushSize:     cfg.FlushSize,
-		shutdown:      &atomic.Bool{},
 	}
 }
 
@@ -50,15 +52,19 @@ func (s *Flusher[T]) Push(elem T) error {
 	defer s.bufMux.Unlock()
 	s.size++
 	s.buf = append(s.buf, elem)
-	if len(s.buf) >= s.flushSize {
+	if len(s.buf) >= s.flushSize && !s.flushNeed.Load() {
 		s.fillChan <- struct{}{}
+		s.flushNeed.Store(true)
 	}
 	return nil
 }
 
 func (s *Flusher[T]) doFlush(ctx context.Context) {
 	s.bufMux.Lock()
-	defer s.bufMux.Unlock()
+	defer func() {
+		s.flushNeed.Store(false)
+		s.bufMux.Unlock()
+	}()
 	if len(s.buf) == 0 {
 		return
 	}
