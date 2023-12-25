@@ -71,6 +71,7 @@ func TestFlusher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, err := zap.NewDevelopment()
 			require.NoError(t, err)
+
 			var (
 				wg          = &sync.WaitGroup{}
 				wgw         = &sync.WaitGroup{}
@@ -79,34 +80,49 @@ func TestFlusher(t *testing.T) {
 				outBuf      []string
 				controlBuf  []string
 			)
+
+			// Create flush callback
 			flush := func(_ context.Context, data []string) {
-				logger.Debug("got elements from flusher", zap.Int("len", len(data)))
 				outBuf = append(outBuf, data...)
 			}
+			// Create flusher
 			flusher := NewFlusher[string](&FlusherConfig{
 				Logger:        logger,
 				FlushInterval: tt.args.flushInterval,
 				FlushSize:     tt.args.flushSize,
 				AllocSize:     tt.args.allocSize,
 			}, flush)
-
+			// Run flusher
 			wg.Add(1)
 			go flusher.Run(ctx, wg)
 
+			// Write to flusher concurrently
+			ctrlChan := make(chan string, 1000)
 			for w := 0; w < tt.args.workers; w++ {
 				wgw.Add(1)
 				go func() {
 					for i := 0; i < tt.args.elemNum; i++ {
 						fake := faker.NounAbstract()
-						controlBuf = append(controlBuf, fake)
+						ctrlChan <- fake
 						require.NoError(t, flusher.Push(fake))
 					}
 					wgw.Done()
 				}()
-				wgw.Wait()
 			}
+			// Gather flushes
+			wg.Add(1)
+			go func() {
+				for elem := range ctrlChan {
+					controlBuf = append(controlBuf, elem)
+				}
+				wg.Done()
+			}()
+			// Wait and finish
+			wgw.Wait()
+			close(ctrlChan)
 			cancel()
 			wg.Wait()
+			// Check that len of flushed elements is equal to len of generated elements
 			require.NotEmpty(t, outBuf)
 			assert.Equal(t, len(controlBuf), len(outBuf))
 		})
