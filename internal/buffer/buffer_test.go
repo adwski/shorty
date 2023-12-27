@@ -12,6 +12,43 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestFlusherLateAsyncFlush(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	var (
+		ctx, cancel = context.WithCancel(context.Background())
+		wg          = &sync.WaitGroup{}
+		outBuf      = make([]string, 0)
+	)
+
+	flush := func(_ context.Context, data []string) {
+		go func() {
+			time.Sleep(time.Second)
+			outBuf = append(outBuf, data...)
+		}()
+	}
+
+	flusher := NewFlusher[string](&FlusherConfig{
+		Logger:        logger,
+		FlushInterval: 10 * time.Second,
+		FlushSize:     10,
+		AllocSize:     20,
+	}, flush)
+	// Run flusher
+	wg.Add(1)
+	go flusher.Run(ctx, wg)
+
+	require.NoError(t, flusher.Push("aaa"))
+	flusher.doFlush(ctx)
+	require.NoError(t, flusher.Push("bbb"))
+	time.Sleep(2 * time.Second)
+	assert.Equal(t, "aaa", outBuf[0])
+
+	cancel()
+	wg.Wait()
+}
+
 func TestFlusher(t *testing.T) {
 	type args struct {
 		flushInterval time.Duration
@@ -19,6 +56,9 @@ func TestFlusher(t *testing.T) {
 		allocSize     int
 		elemNum       int
 		workers       int
+		async         bool
+		asyncSleep    time.Duration
+		gatherSleep   time.Duration
 	}
 
 	type testCase struct {
@@ -37,7 +77,7 @@ func TestFlusher(t *testing.T) {
 			},
 		},
 		{
-			name: "process 100 async from 10 workers each",
+			name: "process 100 from 10 workers each",
 			args: args{
 				flushInterval: 10 * time.Second,
 				flushSize:     5,
@@ -47,13 +87,26 @@ func TestFlusher(t *testing.T) {
 			},
 		},
 		{
-			name: "process 100 async from 20 workers short interval",
+			name: "process 100 from 20 workers short interval",
 			args: args{
 				flushInterval: 100 * time.Millisecond,
 				flushSize:     5,
 				allocSize:     10,
 				elemNum:       100,
 				workers:       20,
+			},
+		},
+		{
+			name: "process 100 async from 20 workers",
+			args: args{
+				flushInterval: 100 * time.Second,
+				flushSize:     10,
+				allocSize:     20,
+				elemNum:       100,
+				workers:       20,
+				async:         true,
+				asyncSleep:    2 * time.Second,
+				gatherSleep:   3 * time.Second,
 			},
 		},
 		{
@@ -75,6 +128,7 @@ func TestFlusher(t *testing.T) {
 			var (
 				wg          = &sync.WaitGroup{}
 				wgw         = &sync.WaitGroup{}
+				cbCh        = make(chan []string, 100000)
 				ctx, cancel = context.WithCancel(context.Background())
 				faker       = gofakeit.New(time.Now().UnixMicro())
 				outBuf      []string
@@ -83,8 +137,33 @@ func TestFlusher(t *testing.T) {
 
 			// Create flush callback
 			flush := func(_ context.Context, data []string) {
-				outBuf = append(outBuf, data...)
+				if !tt.args.async {
+					outBuf = append(outBuf, data...)
+					return
+				}
+				go func() {
+					if tt.args.asyncSleep > 0 {
+						time.Sleep(tt.args.asyncSleep)
+					}
+					cbCh <- data
+				}()
 			}
+			if tt.args.async {
+				wg.Add(1)
+				go func() {
+				Loop:
+					for {
+						select {
+						case d := <-cbCh:
+							outBuf = append(outBuf, d...)
+						case <-time.After(tt.args.gatherSleep):
+							break Loop
+						}
+					}
+					wg.Done()
+				}()
+			}
+
 			// Create flusher
 			flusher := NewFlusher[string](&FlusherConfig{
 				Logger:        logger,
@@ -117,6 +196,7 @@ func TestFlusher(t *testing.T) {
 				}
 				wg.Done()
 			}()
+
 			// Wait and finish
 			wgw.Wait()
 			close(ctrlChan)
