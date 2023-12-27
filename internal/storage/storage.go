@@ -6,9 +6,12 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
 	ErrConflict      = errors.New("conflict")
+	ErrDeleted       = errors.New("deleted")
 )
 
 type URL struct {
-	Short string
-	Orig  string
+	Short  string `json:"short_url"`
+	Orig   string `json:"original_url"`
+	UserID string `json:"-"`
+	TS     int64  `json:"-"`
 }

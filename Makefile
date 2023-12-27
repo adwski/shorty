@@ -9,12 +9,19 @@ unittests: mock
 
 .PHONY: build
 build:
-	go build -o ./cmd/shortener/shortener ./cmd/shortener/*.go
+	go build -gcflags "-m" -race -o ./cmd/shortener/shortener ./cmd/shortener/*.go
 
 # Run it like this
 # > make shortenertest TESTNUM=7
 .PHONY: shortenertest
 shortenertest: build
+		shortenertestbeta -test.v -test.run=^TestIteration$$TESTNUM$$ \
+                      -binary-path=cmd/shortener/shortener \
+                      -source-path=. \
+                      -database-dsn='postgres://shorty:shorty@127.0.0.1/shorty?sslmode=disable'
+
+.PHONY: shortenertests
+shortenertests: build
 	for num in 1 2 3 4 5 6 7 8 9; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
@@ -22,7 +29,7 @@ shortenertest: build
                       -server-port=$$(random unused-port) \
                       -file-storage-path=/tmp/short-url-db-test.json || exit 1 ; \
 	done
-	for num in 10 11 12 13; do \
+	for num in 10 11 12 13 14 15; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \
@@ -42,10 +49,13 @@ goimports:
 	goimports -w  .
 
 .PHONY: test
-test: mock goimports lint unittests statictest shortenertest
+test: mock goimports lint unittests statictest
 
 .PHONY: integration-tests
-integration-tests: docker-dev
+integration-tests: docker-dev db-tests shortenertests
+
+.PHONY: db-tests
+db-tests:
 	go test ./... -v -count=1 -cover --tags=integration -run=TestDatabase*
 
 .PHONY: image-release

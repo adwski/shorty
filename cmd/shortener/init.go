@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -20,7 +21,7 @@ const (
 	defaultLogLevel = zapcore.DebugLevel
 )
 
-func initLogger() (*zap.Logger, bool) {
+func initLogger() (*zap.Logger, error) {
 	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		MessageKey:     "msg",
 		LevelKey:       "level",
@@ -31,35 +32,22 @@ func initLogger() (*zap.Logger, bool) {
 	})
 	var (
 		err                 error
-		logLvl              zapcore.Level
-		lvlOk               bool
-		envEmpty            bool
+		logLvl              = defaultLogLevel
 		logLevel, envExists = os.LookupEnv(envLogLevel)
 	)
 	if envExists {
 		if logLevel == "" {
-			envEmpty = true
+			err = errors.New(envLogLevel + " env is defined but empty")
 		} else {
-			if logLvl, err = zapcore.ParseLevel(logLevel); err == nil {
-				// set default level just to create logger and print out error
-				logLvl = defaultLogLevel
+			if logLvl, err = zapcore.ParseLevel(logLevel); err != nil {
+				err = fmt.Errorf("cannot parse log level: %w", err)
 			} else {
-				// loglevel value is correct
-				lvlOk = true
+				logLvl = defaultLogLevel
 			}
 		}
-	} else {
-		// env was not set, using default level
-		lvlOk = true
-		logLvl = defaultLogLevel
 	}
 	logger := zap.New(zapcore.NewCore(encoder, os.Stdout, logLvl))
-	if envEmpty {
-		logger.Error("log level env is set but empty", zap.String("env", envLogLevel))
-	} else if err != nil {
-		logger.Error("could not parse log level", zap.String("env", envLogLevel), zap.Error(err))
-	}
-	return logger, lvlOk
+	return logger, err
 }
 
 func initStorage(ctx context.Context, logger *zap.Logger, cfg *config.Storage) (store app.Storage, err error) {

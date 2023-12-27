@@ -5,23 +5,28 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/adwski/shorty/internal/session"
+
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type stub struct {
-	r         *http.Request
+	reqID     string
 	wasCalled bool
+	haveReqID bool
 }
 
 func (s *stub) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
 	s.wasCalled = true
-	s.r = r
+	s.reqID, s.haveReqID = session.GetRequestID(r.Context())
 }
 
 func TestMiddleware(t *testing.T) {
 	type args struct {
-		generate      bool
+		trust         bool
 		incomingReqID string
 	}
 	type want struct {
@@ -33,66 +38,66 @@ func TestMiddleware(t *testing.T) {
 		want want
 	}{
 		{
-			name: "generate request id",
+			name: "gen request id",
 			args: args{
-				generate: true,
+				trust: false,
 			},
 			want: want{
 				newReqID: true,
 			},
 		},
 		{
-			name: "generate new request id",
+			name: "trust request id",
 			args: args{
-				generate:      true,
-				incomingReqID: "qweqwe",
-			},
-			want: want{
-				newReqID: true,
-			},
-		},
-		{
-			name: "keep request id",
-			args: args{
-				generate:      false,
-				incomingReqID: "qweqwe",
+				trust:         true,
+				incomingReqID: "asdasd",
 			},
 			want: want{
 				newReqID: false,
+			},
+		},
+		{
+			name: "do not trust request id",
+			args: args{
+				trust:         false,
+				incomingReqID: "qweqwe",
+			},
+			want: want{
+				newReqID: true,
 			},
 		},
 		{
 			name: "empty request id",
 			args: args{
-				generate:      false,
+				trust:         true,
 				incomingReqID: "",
 			},
 			want: want{
-				newReqID: false,
+				newReqID: true,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mw := New(&Config{Generate: tt.args.generate})
+			logger, err := zap.NewDevelopment()
+			require.NoError(t, err)
+			mw := New(&Config{Trust: tt.args.trust, Logger: logger})
 
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			if tt.args.incomingReqID != "" {
 				r.Header.Set("X-Request-ID", tt.args.incomingReqID)
 			}
 			s := &stub{}
-			mw.Chain(s)
+			mw.HandlerFunc(s)
 			mw.ServeHTTP(nil, r)
-
-			reqID := s.r.Header.Get("X-Request-ID")
-
 			require.True(t, s.wasCalled)
+			require.True(t, s.haveReqID)
 
 			if tt.want.newReqID {
-				assert.NotEmpty(t, reqID)
-				assert.NotEqual(t, tt.args.incomingReqID, reqID)
+				assert.NotEmpty(t, s.reqID)
+				assert.NotEqual(t, tt.args.incomingReqID, s.reqID)
 			} else {
-				assert.Equal(t, tt.args.incomingReqID, reqID)
+				assert.Equal(t, tt.args.incomingReqID, s.reqID)
 			}
 		})
 	}

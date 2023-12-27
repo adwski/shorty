@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -29,15 +30,26 @@ const (
 
 // File is a simple in-memory store with file persistence.
 // Saving into file is done in background without affecting
-// Get/Set operations. Since file is completely rewritten on each
+// Get/Store operations. Since file is completely rewritten on each
 // interval, this store is not suited for large quantities of records.
 type File struct {
 	*memory.Memory
-	log      *zap.Logger
-	done     chan struct{}
+	log *zap.Logger
+
+	// finish communicates signal that shutdown is complete
+	finish chan struct{}
+
+	// done communicates signal to start shutdown process
+	// (Close was called without context cancellation)
+	done chan struct{}
+
 	filePath string
-	changed  bool
-	shutdown bool
+
+	// changed indicates that in-memory store was changed after last file persistence
+	changed atomic.Bool
+
+	// shutdown indicates that storage is in process of shutting down
+	shutdown atomic.Bool
 }
 
 type Config struct {
@@ -70,64 +82,80 @@ func New(ctx context.Context, cfg *Config) (*File, error) {
 
 	s := &File{
 		Memory:   st,
-		log:      cfg.Logger,
+		log:      cfg.Logger.With(zap.String("component", "fs-storage")),
 		filePath: cfg.FilePath,
-		done:     make(chan struct{}),
+		finish:   make(chan struct{}),
+		done:     make(chan struct{}, 1),
 	}
 	go s.maintainPersistence(ctx)
 	return s, nil
 }
 
 func (s *File) Close() {
-	<-s.done
+	s.done <- struct{}{}
+	<-s.finish
 }
 
 func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
-	if s.shutdown {
+	if s.shutdown.Load() {
 		return "", errors.New("storage is shutting down")
 	}
 	if _, err := s.Memory.Store(ctx, url, overwrite); err != nil {
-		return "", fmt.Errorf("cannot store url: %w", err)
+		return "", fmt.Errorf("memory storage error: %w", err)
 	}
-	s.changed = true
+	s.changed.Store(true)
 	return "", nil
 }
 
 func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
-	if s.shutdown {
+	if s.shutdown.Load() {
 		return errors.New("storage is shutting down")
 	}
 	if err := s.Memory.StoreBatch(ctx, urls); err != nil {
-		return fmt.Errorf("cannot store url: %w", err)
+		return fmt.Errorf("memory storage error: %w", err)
 	}
-	s.changed = true
+	s.changed.Store(true)
 	return nil
+}
+
+func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
+	if s.shutdown.Load() {
+		return 0, errors.New("storage is shutting down")
+	}
+	affected, err := s.Memory.DeleteUserURLs(ctx, urls)
+	if err != nil {
+		return 0, fmt.Errorf("memory storage error: %w", err)
+	}
+	s.changed.Store(true)
+	return affected, nil
 }
 
 func (s *File) maintainPersistence(ctx context.Context) {
 Loop:
 	for {
 		select {
+		case <-s.done:
 		case <-ctx.Done():
-			s.shutdown = true
-			s.persist()
-			break Loop
 		case <-time.After(flushInterval):
 			s.persist()
+			continue
 		}
+		s.shutdown.Store(true)
+		s.persist()
+		break Loop
 	}
-	close(s.done)
+	close(s.finish)
 }
 
 func (s *File) persist() {
-	if !s.changed {
+	if !s.changed.Load() {
 		return
 	}
 	if err := s.dumpDB2File(); err != nil {
 		s.log.Error("cannot save db to file",
 			zap.Error(err))
 	} else {
-		s.changed = false
+		s.changed.Store(false)
 		s.log.Debug("db was saved to file",
 			zap.String("path", s.filePath))
 	}

@@ -16,13 +16,17 @@ import (
 )
 
 func main() {
-	logger, lvlParseOk := initLogger()
+	logger, errLvl := initLogger()
 	defer func() {
-		if errLog := logger.Sync(); errLog != nil && !errors.Is(errLog, syscall.ENOTTY) {
+		if errLog := logger.Sync(); errLog != nil &&
+			!errors.Is(errLog, syscall.EBADF) &&
+			!errors.Is(errLog, syscall.EINVAL) &&
+			!errors.Is(errLog, syscall.ENOTTY) {
 			log.Println("failed to sync zap logger", errLog)
 		}
 	}()
-	if !lvlParseOk {
+	if errLvl != nil {
+		logger.Error("cannot parse log level", zap.Error(errLvl))
 		defer os.Exit(1)
 		return
 	}

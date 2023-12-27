@@ -9,6 +9,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
+
+	"github.com/adwski/shorty/internal/user"
+
+	"github.com/adwski/shorty/internal/buffer"
 
 	"github.com/adwski/shorty/internal/generators"
 
@@ -20,15 +25,20 @@ const (
 	defaultStoreRetries = 3
 )
 
+var ErrRequestCtxMsg = "request context error"
+
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
+	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
+	DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error)
 }
 
 // Service implements http handler for shortened urls management.
 type Service struct {
 	store          Storage
+	flusher        *buffer.Flusher[storage.URL]
 	log            *zap.Logger
 	servedScheme   string
 	redirectScheme string
@@ -36,29 +46,30 @@ type Service struct {
 	pathLength     uint
 }
 
+func (svc *Service) Run(ctx context.Context, wg *sync.WaitGroup) {
+	svc.flusher.Run(ctx, wg)
+}
+
 func (svc *Service) getServedURL(shortPath string) string {
 	return fmt.Sprintf("%s://%s/%s", svc.servedScheme, svc.host, shortPath)
 }
 
-func (svc *Service) storeURL(ctx context.Context, u string) (path string, err error) {
+func (svc *Service) storeURL(ctx context.Context, user *user.User, u string) (path string, err error) {
 	for i := 1; i <= defaultStoreRetries; i++ {
 		path = generators.RandString(svc.pathLength)
 
-		svc.log.Debug("storing url",
-			zap.String("key", path),
-			zap.Int("try", i),
-			zap.String("url", u))
-
 		var storedPath string
 		if storedPath, err = svc.store.Store(ctx, &storage.URL{
-			Short: path,
-			Orig:  u,
+			Short:  path,
+			Orig:   u,
+			UserID: user.ID,
 		}, false); err != nil {
 			if errors.Is(err, storage.ErrConflict) {
 				path = storedPath
 				return
+			} else if errors.Is(err, storage.ErrAlreadyExists) {
+				continue
 			}
-			continue
 		}
 		return
 	}
@@ -70,6 +81,10 @@ func getRedirectURLFromBody(req *http.Request) (u *url.URL, err error) {
 	var body []byte
 	if body, err = readBody(req); err != nil {
 		err = fmt.Errorf("cannot get url from request body: %w", err)
+		return
+	}
+	if len(body) == 0 {
+		err = fmt.Errorf("empty body")
 		return
 	}
 	if u, err = url.Parse(string(body)); err != nil {

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/session"
+
 	"github.com/adwski/shorty/internal/storage"
 
 	"github.com/adwski/shorty/internal/validate"
@@ -29,86 +31,99 @@ type ShortenResponse struct {
 // and stores URL in storage. If something is wrong with body or Content-Length
 // it returns 400 error. Stored shortened path is sent back to client.
 func (svc *Service) ShortenPlain(w http.ResponseWriter, req *http.Request) {
-	var (
-		shortPath string
-		srcURL    *url.URL
-		err       error
-	)
+	u, reqID, err := session.GetUserAndReqID(req.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		svc.log.Error(ErrRequestCtxMsg, zap.Error(err))
+		return
+	}
+	logf := svc.log.With(zap.String("id", reqID))
 
-	if srcURL, err = getRedirectURLFromBody(req); err != nil {
+	srcURL, errU := getRedirectURLFromBody(req)
+	if errU != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("url is not valid", zap.Error(err))
+		logf.Error("url is not valid", zap.Error(errU))
 		return
 	}
 
 	if svc.redirectScheme != "" && srcURL.Scheme != svc.redirectScheme {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("scheme is not supported",
+		logf.Error("scheme is not supported",
 			zap.String("scheme", srcURL.Scheme),
 			zap.String("supported", svc.redirectScheme))
 		return
 	}
 
-	if shortPath, err = svc.storeURL(req.Context(), srcURL.String()); err != nil {
-		if !errors.Is(err, storage.ErrConflict) {
+	logf.Debug("storing url in plain handler")
+
+	shortPath, errP := svc.storeURL(req.Context(), u, srcURL.String())
+	if errP != nil {
+		if !errors.Is(errP, storage.ErrConflict) {
 			w.WriteHeader(http.StatusInternalServerError)
-			svc.log.Error("cannot store url", zap.Error(err))
+			logf.Error("cannot store url", zap.Error(errP))
 			return
 		}
 	}
 
 	w.Header().Set(headerContentType, "text/plain")
-	if errors.Is(err, storage.ErrConflict) {
+	if errors.Is(errP, storage.ErrConflict) {
 		w.WriteHeader(http.StatusConflict)
 	} else {
 		w.WriteHeader(http.StatusCreated)
 	}
 	if _, err = w.Write([]byte(svc.getServedURL(shortPath))); err != nil {
-		svc.log.Error("error writing body", zap.Error(err))
+		logf.Error("error writing body", zap.Error(err))
 	}
 }
 
 // ShortenJSON does the same as Shorten but operates with json.
 func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
-	var (
-		srcURL      *url.URL
-		shortenResp []byte
-		err         error
-	)
+	u, reqID, err := session.GetUserAndReqID(req.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		svc.log.Error(ErrRequestCtxMsg, zap.Error(err))
+		return
+	}
+	logf := svc.log.With(zap.String("id", reqID))
+
 	if err = validate.ShortenRequestJSON(req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("shorten request is not valid", zap.Error(err))
+		logf.Error("shorten request is not valid", zap.Error(err))
 		return
 	}
 
-	if srcURL, err = getRedirectURLFromJSONBody(req); err != nil {
+	srcURL, errU := getRedirectURLFromJSONBody(req)
+	if errU != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("cannot get url from request body", zap.Error(err))
+		logf.Error("cannot get url from request body", zap.Error(errU))
 		return
 	}
 
 	if svc.redirectScheme != "" && srcURL.Scheme != svc.redirectScheme {
 		w.WriteHeader(http.StatusBadRequest)
-		svc.log.Error("scheme is not supported",
+		logf.Error("scheme is not supported",
 			zap.String("scheme", srcURL.Scheme),
 			zap.String("supported", svc.redirectScheme))
 		return
 	}
 
-	shortPath, errStore := svc.storeURL(req.Context(), srcURL.String())
+	logf.Debug("storing url in json handler")
+
+	shortPath, errStore := svc.storeURL(req.Context(), u, srcURL.String())
 	if errStore != nil {
 		if !errors.Is(errStore, storage.ErrConflict) {
 			w.WriteHeader(http.StatusInternalServerError)
-			svc.log.Error("cannot store url", zap.Error(err))
+			logf.Error("cannot store url", zap.Error(errStore))
 			return
 		}
 	}
 
-	if shortenResp, err = json.Marshal(&ShortenResponse{
+	shortenResp, errR := json.Marshal(&ShortenResponse{
 		Result: svc.getServedURL(shortPath),
-	}); err != nil {
+	})
+	if errR != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error("cannot marshall response", zap.Error(err))
+		logf.Error("cannot marshall response", zap.Error(errR))
 		return
 	}
 
@@ -119,7 +134,7 @@ func (svc *Service) ShortenJSON(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	}
 	if _, err = w.Write(shortenResp); err != nil {
-		svc.log.Error("error writing json body", zap.Error(err))
+		logf.Error("error writing json body", zap.Error(err))
 	}
 }
 

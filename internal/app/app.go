@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
-
 	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/middleware/auth"
 	"github.com/adwski/shorty/internal/middleware/compress"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/services/status"
+	"github.com/adwski/shorty/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -34,6 +34,8 @@ type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
 	StoreBatch(ctx context.Context, urls []storage.URL) error
+	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
+	DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error)
 	Ping(ctx context.Context) error
 	Close()
 }
@@ -42,9 +44,10 @@ type Storage interface {
 // It consists of shortener and redirector services
 // Also it uses key-value storage to store URLs and shortened paths.
 type Shorty struct {
-	log    *zap.Logger
-	server *http.Server
-	host   string
+	log       *zap.Logger
+	server    *http.Server
+	shortener *shortener.Service
+	host      string
 }
 
 // NewShorty creates Shorty instance from config.
@@ -66,12 +69,21 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 		Logger:  logger,
 	})
 
-	router := getRouterWithMiddleware(logger, cfg.GenerateReqID)
-	bindServices(router, shortenerSvc, resolverSvc, statusSvc)
+	r := getRouterWithMiddleware(logger, cfg.TrustRequestID)
+	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
+		r.Get("/api/user/urls", shortenerSvc.GetURLs)
+		r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
+		r.Post("/api/shorten", shortenerSvc.ShortenJSON)
+		r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
+		r.Post("/", shortenerSvc.ShortenPlain)
+	})
+	r.Get("/{path}", resolverSvc.Resolve)
+	r.Get("/ping", statusSvc.Ping)
 
 	return &Shorty{
-		log:  logger,
-		host: cfg.Host,
+		log:       logger.With(zap.String("component", "api")),
+		host:      cfg.Host,
+		shortener: shortenerSvc,
 		server: &http.Server{
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
@@ -79,29 +91,17 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 			WriteTimeout:      defaultWriteTimeout,
 			IdleTimeout:       defaultIdleTimeout,
 			ErrorLog:          log.New(newSrvLogger(logger), "", 0),
-			Handler:           router,
+			Handler:           r,
 		},
 	}
 }
 
-func bindServices(router *chi.Mux,
-	shortenerSvc *shortener.Service,
-	resolverSvc *resolver.Service,
-	statusSvc *status.Service,
-) {
-	router.Post("/", shortenerSvc.ShortenPlain)
-	router.Post("/api/shorten", shortenerSvc.ShortenJSON)
-	router.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
-	router.Get("/{path}", resolverSvc.Resolve)
-	router.Get("/ping", statusSvc.Ping)
-}
-
-func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) *chi.Mux {
+func getRouterWithMiddleware(logger *zap.Logger, trustRequestID bool) chi.Router {
 	router := chi.NewRouter()
 	router.Use(
 		requestid.New(&requestid.Config{
-			Generate: genReqID,
-			Logger:   logger,
+			Trust:  trustRequestID,
+			Logger: logger,
 		}).HandlerFunc,
 		logging.New(&logging.Config{
 			Logger: logger,
@@ -112,10 +112,12 @@ func getRouterWithMiddleware(logger *zap.Logger, genReqID bool) *chi.Mux {
 }
 
 func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
+	wg.Add(1)
+	go sh.shortener.Run(ctx, wg)
+
 	sh.log.Info("starting server",
 		zap.String("address", sh.server.Addr),
 		zap.String("host", sh.host))
-
 	errSrv := make(chan error)
 	go func(errc chan error) {
 		errc <- sh.server.ListenAndServe()
@@ -144,7 +146,7 @@ type srvLogger struct {
 
 func newSrvLogger(logger *zap.Logger) *srvLogger {
 	return &srvLogger{
-		logger: logger.With(zap.String("type", "server")),
+		logger: logger.With(zap.String("component", "server")),
 	}
 }
 

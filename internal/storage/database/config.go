@@ -36,6 +36,7 @@ func New(ctx context.Context, cfg *Config) (*Database, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
 	}
+	logger := cfg.Logger.With(zap.String("component", "database"))
 
 	pCfg, err := pgxpool.ParseConfig(cfg.DSN)
 	if err != nil {
@@ -43,14 +44,14 @@ func New(ctx context.Context, cfg *Config) (*Database, error) {
 	}
 	preparePoolConfig(pCfg)
 	if cfg.Trace {
-		t := newTracers(cfg.Logger)
+		t := newTracers(logger)
 		pCfg.AfterConnect = t.create()
 		pCfg.BeforeClose = t.destroy()
 	}
 
 	db := &Database{
 		config:      pCfg,
-		log:         cfg.Logger,
+		log:         logger,
 		dsn:         cfg.DSN,
 		doMigration: cfg.Migrate,
 	}

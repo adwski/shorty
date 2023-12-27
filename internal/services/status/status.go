@@ -24,7 +24,7 @@ type Config struct {
 func New(cfg *Config) *Service {
 	return &Service{
 		store: cfg.Storage,
-		log:   cfg.Logger,
+		log:   cfg.Logger.With(zap.String("component", "status")),
 	}
 }
 

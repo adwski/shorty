@@ -13,7 +13,8 @@ type Shorty struct {
 	Host           string
 	RedirectScheme string
 	ServedScheme   string
-	GenerateReqID  bool
+	JWTSecret      string
+	TrustRequestID bool
 }
 
 type Storage struct {
@@ -28,8 +29,9 @@ func New() (*Shorty, error) {
 		baseURL         = flag.String("b", "http://localhost:8080", "base server URL")
 		fileStoragePath = flag.String("f", "/tmp/short-url-db.json", "file storage path")
 		databaseDSN     = flag.String("d", "", "postgres connection DSN")
+		jwtSecret       = flag.String("jwt_secret", "supersecret", "jwt cookie secret key")
 		redirectScheme  = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
-		traceDB         = flag.Bool("trace_db", true, "print db wire protocol traces")
+		traceDB         = flag.Bool("trace_db", false, "print db wire protocol traces")
 		trustRequestID  = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
 	)
 	flag.Parse()
@@ -41,6 +43,7 @@ func New() (*Shorty, error) {
 	envOverride("BASE_URL", baseURL)
 	envOverride("FILE_STORAGE_PATH", fileStoragePath)
 	envOverride("DATABASE_DSN", databaseDSN)
+	envOverride("JWT_SECRET", jwtSecret)
 
 	//--------------------------------------------------
 	// Parse server URL
@@ -58,7 +61,8 @@ func New() (*Shorty, error) {
 		Host:           bURL.Host,
 		RedirectScheme: *redirectScheme,
 		ServedScheme:   bURL.Scheme,
-		GenerateReqID:  !*trustRequestID,
+		JWTSecret:      *jwtSecret,
+		TrustRequestID: *trustRequestID,
 		StorageConfig: &Storage{
 			TraceDB:         *traceDB,
 			DatabaseDSN:     *databaseDSN,

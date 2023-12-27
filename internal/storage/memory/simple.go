@@ -38,13 +38,16 @@ func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	if !ok {
 		return "", storage.ErrNotFound
 	}
+	if record.Deleted {
+		return "", storage.ErrDeleted
+	}
 	return record.OriginalURL, nil
 }
 
 func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if _, ok := m.DB[url.Short]; ok && !overwrite {
+	if u, ok := m.DB[url.Short]; ok && !(overwrite || u.Deleted) {
 		return "", storage.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()
@@ -55,8 +58,41 @@ func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (str
 		UUID:        u.String(),
 		ShortURL:    url.Short,
 		OriginalURL: url.Orig,
+		UserID:      url.UserID,
 	}
 	return "", nil
+}
+
+func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL, error) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	var urls []*storage.URL
+	for _, record := range m.DB {
+		if record.UserID == userID {
+			urls = append(urls, &storage.URL{
+				Short:  record.ShortURL,
+				Orig:   record.OriginalURL,
+				UserID: userID,
+			})
+		}
+	}
+	return urls, nil
+}
+
+func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, error) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	var num int64
+	for _, url := range urls {
+		if record, ok := m.DB[url.Short]; ok {
+			if record.UserID == url.UserID {
+				record.Deleted = true
+				m.DB[url.Short] = record
+				num++
+			}
+		}
+	}
+	return num, nil
 }
 
 func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
@@ -64,7 +100,7 @@ func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 	defer m.mux.Unlock()
 	IDs := make([]string, len(urls))
 	for i, url := range urls {
-		if _, ok := m.DB[url.Short]; ok {
+		if u, ok := m.DB[url.Short]; ok && !u.Deleted {
 			return storage.ErrAlreadyExists
 		}
 		u, err := m.gen.NewV4()
@@ -78,6 +114,7 @@ func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 			UUID:        IDs[i],
 			ShortURL:    url.Short,
 			OriginalURL: url.Orig,
+			UserID:      url.UserID,
 		}
 	}
 	return nil
