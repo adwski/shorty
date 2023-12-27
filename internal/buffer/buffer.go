@@ -19,6 +19,7 @@ type Flusher[T any] struct {
 	bufMux        *sync.Mutex
 	buf           []T
 	size          int
+	allocSize     int
 	flushSize     int
 	flushInterval time.Duration
 }
@@ -41,6 +42,7 @@ func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Fl
 		flushNeed:     &atomic.Bool{},
 		flushInterval: cfg.FlushInterval,
 		flushSize:     cfg.FlushSize,
+		allocSize:     cfg.AllocSize,
 	}
 }
 
@@ -70,7 +72,7 @@ func (s *Flusher[T]) doFlush(ctx context.Context) {
 	}
 	s.log.Debug("flushing buffer", zap.Int("len", len(s.buf)))
 	s.flush(ctx, s.buf)
-	s.buf = s.buf[0:0]
+	s.buf = make([]T, 0, s.allocSize)
 }
 
 func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
