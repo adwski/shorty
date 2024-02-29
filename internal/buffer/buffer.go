@@ -1,3 +1,4 @@
+// Package buffer implements delayed batch url handling.
 package buffer
 
 import (
@@ -10,6 +11,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// Flusher is "flushing" queue. It stores data of Type in buffer []Type and "flushes"
+// using configured flushing function.
+//
+// It made as generic to not be depended on specific type.
 type Flusher[T any] struct {
 	log           *zap.Logger
 	shutdown      *atomic.Bool
@@ -24,6 +29,7 @@ type Flusher[T any] struct {
 	flushInterval time.Duration
 }
 
+// FlusherConfig holds flusher configuration params.
 type FlusherConfig struct {
 	Logger        *zap.Logger
 	FlushInterval time.Duration
@@ -31,6 +37,7 @@ type FlusherConfig struct {
 	AllocSize     int
 }
 
+// NewFlusher creates flusher using config and flush function.
 func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Flusher[T] {
 	return &Flusher[T]{
 		log:           cfg.Logger.With(zap.String("component", "flusher")),
@@ -46,6 +53,7 @@ func NewFlusher[T any](cfg *FlusherConfig, flush func(context.Context, []T)) *Fl
 	}
 }
 
+// Push stores element in internal queue.
 func (s *Flusher[T]) Push(elem T) error {
 	if s.shutdown.Load() {
 		return errors.New("flusher is shutting down")
@@ -61,20 +69,7 @@ func (s *Flusher[T]) Push(elem T) error {
 	return nil
 }
 
-func (s *Flusher[T]) doFlush(ctx context.Context) {
-	s.bufMux.Lock()
-	defer func() {
-		s.flushNeed.Store(false)
-		s.bufMux.Unlock()
-	}()
-	if len(s.buf) == 0 {
-		return
-	}
-	s.log.Debug("flushing buffer", zap.Int("len", len(s.buf)))
-	s.flush(ctx, s.buf)
-	s.buf = make([]T, 0, s.allocSize)
-}
-
+// Run starts flush loop. Flushing will occur after configured time interval or after reaching buffer size limit.
 func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 	s.log.Debug("flusher started")
 
@@ -94,4 +89,18 @@ func (s *Flusher[T]) Run(ctx context.Context, wg *sync.WaitGroup) {
 		}
 		s.doFlush(ctx)
 	}
+}
+
+func (s *Flusher[T]) doFlush(ctx context.Context) {
+	s.bufMux.Lock()
+	defer func() {
+		s.flushNeed.Store(false)
+		s.bufMux.Unlock()
+	}()
+	if len(s.buf) == 0 {
+		return
+	}
+	s.log.Debug("flushing buffer", zap.Int("len", len(s.buf)))
+	s.flush(ctx, s.buf)
+	s.buf = make([]T, 0, s.allocSize)
 }

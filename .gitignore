@@ -10,6 +10,7 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*.cov
 
 # Binaries
 cmd/shortener/main
@@ -24,3 +25,6 @@ vendor/
 
 # Linter reports
 report.xml
+
+# local scripts
+load.sh

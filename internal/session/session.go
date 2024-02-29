@@ -1,3 +1,4 @@
+// Package session implements request context operation for context propagated data.
 package session
 
 import (

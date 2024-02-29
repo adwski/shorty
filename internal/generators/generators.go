@@ -1,3 +1,4 @@
+// Package generators implements random sequence generators.
 package generators
 
 import (

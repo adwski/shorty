@@ -1,3 +1,5 @@
+// Package resolver implements shortened URLs redirects.
+// It's independent of shortener service and potentially could be used separately.
 package resolver
 
 import (

@@ -76,3 +76,9 @@ docker-dev:
 docker-dev-clean:
 	cd docker ;\
 	docker compose down -v
+
+.PHONY: godoc
+godoc:
+	@echo "spawning godoc"
+	@echo "navigate to http://localhost:8111/pkg/github.com/adwski/shorty/?m=all"
+	godoc -http=:8111

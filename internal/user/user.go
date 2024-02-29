@@ -1,3 +1,4 @@
+// Package user describes user object and all its internal info.
 package user
 
 import (

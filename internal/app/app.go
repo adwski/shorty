@@ -1,3 +1,5 @@
+// Package app is a complete URL shortener backend application.
+// It uses storage component that should be initialized beforehand.
 package app
 
 import (
@@ -30,6 +32,7 @@ const (
 	defaultPathLength = 8
 )
 
+// Storage defines storage backend methods that is used by Shorty.
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
@@ -96,21 +99,10 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 	}
 }
 
-func getRouterWithMiddleware(logger *zap.Logger, trustRequestID bool) chi.Router {
-	router := chi.NewRouter()
-	router.Use(
-		requestid.New(&requestid.Config{
-			Trust:  trustRequestID,
-			Logger: logger,
-		}).HandlerFunc,
-		logging.New(&logging.Config{
-			Logger: logger,
-		}).HandlerFunc,
-		compress.New().HandlerFunc,
-	)
-	return router
-}
-
+// Run starts internal web server and returned only wen ListenAndServe returns.
+// It is intended to be started asynchronously and canceled via context.
+// Error channel should be used to catch listen errors.
+// If error is caught that means web server is no longer running.
 func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
 	wg.Add(1)
 	go sh.shortener.Run(ctx, wg)
@@ -138,6 +130,21 @@ func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) 
 
 	sh.log.Warn("server stopped")
 	wg.Done()
+}
+
+func getRouterWithMiddleware(logger *zap.Logger, trustRequestID bool) chi.Router {
+	router := chi.NewRouter()
+	router.Use(
+		requestid.New(&requestid.Config{
+			Trust:  trustRequestID,
+			Logger: logger,
+		}).HandlerFunc,
+		logging.New(&logging.Config{
+			Logger: logger,
+		}).HandlerFunc,
+		compress.New().HandlerFunc,
+	)
+	return router
 }
 
 type srvLogger struct {

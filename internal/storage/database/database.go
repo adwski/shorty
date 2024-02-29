@@ -1,3 +1,8 @@
+// Package database is postgreSQL shortened URLs storage.
+//
+// It supports Get/Store operations and batch operations as well.
+// Tracing can be enabled to view low level postgres wire protocol messages
+// in debug log.
 package database
 
 import (
@@ -19,7 +24,7 @@ const (
 	urlsIndexOrig = "urls_orig_key"
 )
 
-// Database is a relational database storage type.
+// Database is a relational database storage connector.
 type Database struct {
 	pool        *pgxpool.Pool
 	config      *pgxpool.Config
@@ -28,12 +33,14 @@ type Database struct {
 	doMigration bool
 }
 
+// Close closes pgx connection pool.
 func (db *Database) Close() {
 	db.log.Debug("closing pgx connection pool")
 	db.pool.Close()
 	db.log.Debug("pgx connection pool is closed")
 }
 
+// Ping pings the database connection. It will be successful only if connection is established.
 func (db *Database) Ping(ctx context.Context) error {
 	if err := db.pool.Ping(ctx); err != nil {
 		return fmt.Errorf("db ping unsuccessful: %w", err)
@@ -41,18 +48,12 @@ func (db *Database) Ping(ctx context.Context) error {
 	return nil
 }
 
+// Store stores url in database. Overwrite flag controls if already stored url can be overwritten if hash is the same.
 func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
 	if overwrite {
 		// we could not do it in one query here
 		// because of conflict with unique orig constraint
 		return db.storeWithOverwrite(ctx, url)
-	}
-
-	// Cleanup deleted urls on Orig collision
-	// I wasn't able to do this together with INSERT in one statement
-	// (considering all other corner cases)
-	if err := db.cleanupDeletedOrig(ctx, url.Orig); err != nil {
-		return "", err
 	}
 
 	// insert new url
@@ -84,52 +85,7 @@ func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool)
 	return "", fmt.Errorf("postgres error: %w", err)
 }
 
-func (db *Database) cleanupDeletedOrig(ctx context.Context, orig string) error {
-	query := `delete from urls where orig = $1 and deleted returning hash, userid`
-	var (
-		hash, userID string
-	)
-	err := db.pool.QueryRow(ctx, query, orig).Scan(&hash, &userID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		return fmt.Errorf("postgres error: %w", err)
-	}
-	db.log.Debug("url was deleted on orig collision",
-		zap.String("hash", hash),
-		zap.String("userID", userID))
-	return nil
-}
-
-func (db *Database) storeWithOverwrite(ctx context.Context, url *storage.URL) (string, error) {
-	if storedURL, err := db.Get(ctx, url.Short); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			// no records, call store with no overwrite
-			return db.Store(ctx, url, false)
-		}
-		// some other error
-		return "", err
-	} else if storedURL == url.Orig {
-		// stored orig value is the same, no need to update
-		return "", nil
-	}
-	// record exists, update it
-	return "", db.updateOrig(ctx, url)
-}
-
-func (db *Database) updateOrig(ctx context.Context, url *storage.URL) error {
-	query := "update urls set hash = $1 where orig = $2"
-	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig)
-	if err != nil {
-		return fmt.Errorf("database update error: %w", err)
-	}
-	if tag.RowsAffected() != 1 {
-		return fmt.Errorf("update affected rows: %d, expected: 1", tag.RowsAffected())
-	}
-	return nil
-}
-
+// StoreBatch stores list of urls using pgx batch insert.
 func (db *Database) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	batch := &pgx.Batch{} // implicit BEGIN and COMMIT
 	for _, url := range urls {
@@ -152,6 +108,7 @@ func (db *Database) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	return nil
 }
 
+// Get retrieves stored url by its hash.
 func (db *Database) Get(ctx context.Context, hash string) (string, error) {
 	var (
 		url     string
@@ -167,6 +124,7 @@ func (db *Database) Get(ctx context.Context, hash string) (string, error) {
 	return url, nil
 }
 
+// ListUserURLs retrieves all urls that have specified user ID.
 func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage.URL, error) {
 	query := `select hash, orig from urls where userid = $1 and deleted = false`
 	rows, err := db.pool.Query(ctx, query, userID)
@@ -194,6 +152,8 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 	return urls, nil
 }
 
+// DeleteUserURLs deletes list of urls using batch query. It performs soft delete, i.e. not actually deleting
+// records from db but just marks them as "deleted".
 func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
 	var (
 		batch    = &pgx.Batch{}
@@ -233,4 +193,32 @@ func (db *Database) getHashByURL(ctx context.Context, url string) (hash string, 
 		err = storage.ErrNotFound
 	}
 	return
+}
+
+func (db *Database) storeWithOverwrite(ctx context.Context, url *storage.URL) (string, error) {
+	if storedURL, err := db.Get(ctx, url.Short); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// no records, call store with no overwrite
+			return db.Store(ctx, url, false)
+		}
+		// some other error
+		return "", err
+	} else if storedURL == url.Orig {
+		// stored orig value is the same, no need to update
+		return "", nil
+	}
+	// record exists, update it
+	return "", db.updateOrig(ctx, url)
+}
+
+func (db *Database) updateOrig(ctx context.Context, url *storage.URL) error {
+	query := "update urls set hash = $1 where orig = $2"
+	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig)
+	if err != nil {
+		return fmt.Errorf("database update error: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("update affected rows: %d, expected: 1", tag.RowsAffected())
+	}
+	return nil
 }
