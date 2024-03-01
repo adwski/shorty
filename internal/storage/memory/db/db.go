@@ -12,7 +12,7 @@ import (
 )
 
 // DB is in-memory database of shortened URLs.
-// It represented as map hash->URL
+// It represented as map hash->URL.
 type DB map[string]Record
 
 // NewDB create new in-memory URL database.

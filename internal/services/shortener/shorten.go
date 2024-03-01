@@ -24,7 +24,7 @@ type ShortenRequest struct {
 	URL string `json:"url"`
 }
 
-// ShortenResponse is a single URL shorten response
+// ShortenResponse is a single URL shorten response.
 type ShortenResponse struct {
 	Result string `json:"result"`
 }

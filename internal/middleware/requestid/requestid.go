@@ -1,6 +1,6 @@
 // Package requestid implements request ID middleware.
 //
-// request IDs are generated using UUIDv4. Middleware has an option
+// Request IDs are generated using UUIDv4. Middleware has an option
 // to trust incoming X-Request-ID headers.
 package requestid
 
