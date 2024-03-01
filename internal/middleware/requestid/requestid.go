@@ -1,3 +1,7 @@
+// Package requestid implements request ID middleware.
+//
+// request IDs are generated using UUIDv4. Middleware has an option
+// to trust incoming X-Request-ID headers.
 package requestid
 
 import (
@@ -10,6 +14,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
+// Middleware is requestID middleware.
 type Middleware struct {
 	gen     uuid.Generator
 	handler http.Handler
@@ -17,11 +22,13 @@ type Middleware struct {
 	trust   bool
 }
 
+// Config is requestID middleware configuration.
 type Config struct {
 	Logger *zap.Logger
 	Trust  bool
 }
 
+// New creates requestID middleware.
 func New(cfg *Config) *Middleware {
 	return &Middleware{
 		log:   cfg.Logger.With(zap.String("component", "request-id")),
@@ -30,11 +37,14 @@ func New(cfg *Config) *Middleware {
 	}
 }
 
+// HandlerFunc sets upstream middleware handler.
 func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
 
+// ServeHTTP checks requestID header and/or generates new requestID which is passed
+// to upstream handlers using request context.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if mw.trust {
 		if reqID := r.Header.Get("X-Request-ID"); reqID != "" {

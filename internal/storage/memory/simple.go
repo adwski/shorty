@@ -1,3 +1,4 @@
+// Package memory is simple in-memory shortened URL storage.
 package memory
 
 import (
@@ -21,6 +22,7 @@ type Memory struct {
 	gen uuid.Generator
 }
 
+// New create new memory storage.
 func New() *Memory {
 	return &Memory{
 		DB:  db.NewDB(),
@@ -29,8 +31,10 @@ func New() *Memory {
 	}
 }
 
+// Close does nothing. It's here just to comply to shortener interface.
 func (m *Memory) Close() {}
 
+// Get retrieves URL from storage.
 func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -44,6 +48,7 @@ func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	return record.OriginalURL, nil
 }
 
+// Store stores shortened URL in storage.
 func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -63,6 +68,7 @@ func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (str
 	return "", nil
 }
 
+// ListUserURLs returns all URL by specified user.
 func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -79,6 +85,7 @@ func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL,
 	return urls, nil
 }
 
+// DeleteUserURLs deleted batch of URLs.
 func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -95,6 +102,7 @@ func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, e
 	return num, nil
 }
 
+// StoreBatch stores URL batch.
 func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -120,6 +128,7 @@ func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
 	return nil
 }
 
+// Dump returns copy of in-memory URL database.
 func (m *Memory) Dump() db.DB {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -128,6 +137,7 @@ func (m *Memory) Dump() db.DB {
 	return dump
 }
 
+// Ping does nothing. It's here just to comply to shortener interface.
 func (m *Memory) Ping(_ context.Context) error {
 	return nil
 }

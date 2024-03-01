@@ -17,11 +17,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// BatchURL is single batch element in batch shorten request.
 type BatchURL struct {
 	ID  string `json:"correlation_id"`
 	URL string `json:"original_url"`
 }
 
+// BatchShortened is single batch element in batch shorten response.
 type BatchShortened struct {
 	ID    string `json:"correlation_id"`
 	Short string `json:"short_url"`

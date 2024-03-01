@@ -1,3 +1,4 @@
+// Package profiler is pprof component wrapped as runnable server.
 package profiler
 
 import (
@@ -10,16 +11,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// Profiler is profiler server.
 type Profiler struct {
 	log *zap.Logger
 	srv *http.Server
 }
 
+// Config is profiler server config.
 type Config struct {
 	Logger        *zap.Logger
 	ListenAddress string
 }
 
+// New creates profiler server.
 func New(cfg *Config) *Profiler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -37,6 +41,7 @@ func New(cfg *Config) *Profiler {
 	}
 }
 
+// Run starts profiler server. It should be called asynchronously and stopped with context cancellation.
 func (p *Profiler) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
 	p.log.Info("starting server",
 		zap.String("address", p.srv.Addr))

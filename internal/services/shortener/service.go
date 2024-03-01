@@ -25,8 +25,10 @@ const (
 	defaultStoreRetries = 3
 )
 
+// ErrRequestCtxMsg is thrown when service fails to read user from request context.
 var ErrRequestCtxMsg = "request context error"
 
+// Storage is URL storage used by shortener.
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
@@ -46,6 +48,7 @@ type Service struct {
 	pathLength     uint
 }
 
+// Run starts flusher queue.
 func (svc *Service) Run(ctx context.Context, wg *sync.WaitGroup) {
 	svc.flusher.Run(ctx, wg)
 }

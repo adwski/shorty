@@ -73,7 +73,7 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 	})
 
 	r := getRouterWithMiddleware(logger, cfg.TrustRequestID)
-	r.With(auth.New(logger, cfg.JWTSecret).HandleFunc).Route("/", func(r chi.Router) {
+	r.With(auth.New(logger, cfg.JWTSecret).HandlerFunc).Route("/", func(r chi.Router) {
 		r.Get("/api/user/urls", shortenerSvc.GetURLs)
 		r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
 		r.Post("/api/shorten", shortenerSvc.ShortenJSON)
@@ -157,6 +157,7 @@ func newSrvLogger(logger *zap.Logger) *srvLogger {
 	}
 }
 
+// Write writes byte slice as one Error log message.
 func (sl *srvLogger) Write(b []byte) (int, error) {
 	sl.logger.Error(string(b))
 	return len(b), nil

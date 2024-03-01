@@ -13,6 +13,7 @@ const (
 	flusherFlushInterval = 3 * time.Second
 )
 
+// Config is shortener service configuration.
 type Config struct {
 	Store          Storage
 	Logger         *zap.Logger
@@ -22,6 +23,7 @@ type Config struct {
 	PathLength     uint
 }
 
+// New create new shortener service.
 func New(cfg *Config) *Service {
 	logger := cfg.Logger.With(zap.String("component", "shortener"))
 

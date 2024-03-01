@@ -1,3 +1,4 @@
+// Package config defines configuration for Shorty app.
 package config
 
 import (
@@ -7,6 +8,7 @@ import (
 	"os"
 )
 
+// Shorty holds Shorty app config params.
 type Shorty struct {
 	StorageConfig   *Storage
 	ListenAddr      string
@@ -18,12 +20,14 @@ type Shorty struct {
 	TrustRequestID  bool
 }
 
+// Storage holds Shorty storage config params.
 type Storage struct {
 	DatabaseDSN     string
 	FileStoragePath string
 	TraceDB         bool
 }
 
+// New creates Shorty config using command line argument and environment variables.
 func New() (*Shorty, error) {
 	var (
 		listenAddr      = flag.String("a", ":8080", "listen address")

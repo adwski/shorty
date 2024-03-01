@@ -1,3 +1,6 @@
+// Package logging implements logging middleware.
+//
+// It writes two log messages: for request and response which can be correlated using request ID.
 package logging
 
 import (
@@ -12,15 +15,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// Middleware is logging middleware.
 type Middleware struct {
 	log     *zap.Logger
 	handler http.Handler
 }
 
+// Config is logging middleware config.
 type Config struct {
 	Logger *zap.Logger
 }
 
+// New create new logging middleware.
 func New(cfg *Config) *Middleware {
 	return &Middleware{
 		log: cfg.Logger.With(zap.String("component", "http")),
@@ -41,6 +47,7 @@ func newResponseWrapper(w http.ResponseWriter) *rwWrapper {
 	}
 }
 
+// Write writes response body and header if it wasn't written before.
 func (rw *rwWrapper) Write(b []byte) (int, error) {
 	if !rw.wroteHeader {
 		rw.flushHeader()
@@ -68,20 +75,21 @@ func (rw *rwWrapper) flushHeader() {
 	rw.wroteHeader = true
 }
 
+// WriteHeader sets response code without writing actual response status.
 func (rw *rwWrapper) WriteHeader(statusCode int) {
 	rw.status = statusCode
 }
 
+// HandlerFunc sets upstream middleware handler.
 func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
 
-func (mw *Middleware) Chain(h http.Handler) *Middleware {
-	mw.handler = h
-	return mw
-}
-
+// ServeHTTP writes log messages for request and response.
+// It tries to recover panic if it occurs and write appropriate log msg.
+// Header write by upstream handlers is delayed in order to have bigger chance
+// to catch panic after WriteHeader is called.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		start    = time.Now()

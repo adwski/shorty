@@ -1,3 +1,8 @@
+// Package compress implements compression middleware.
+//
+// Supported algorithms are gzip and deflate.
+// Only application/json and text/plain will be compressed if client
+// set appropriate Accept-Encoding value.
 package compress
 
 import (
@@ -13,10 +18,12 @@ const (
 	typeDeflate = "deflate"
 )
 
+// Middleware is compress middleware.
 type Middleware struct {
 	handler http.Handler
 }
 
+// New creates new compress middleware.
 func New() *Middleware {
 	return &Middleware{}
 }
@@ -43,6 +50,8 @@ func (rw *rwWrapper) close() {
 	}
 }
 
+// Write writes body either to compression writer or to response body directly depending on
+// whether compression writer is nil or not.
 func (rw *rwWrapper) Write(b []byte) (n int, err error) {
 	if rw.cw != nil {
 		n, err = rw.cw.Write(b)
@@ -61,6 +70,7 @@ func (rw *rwWrapper) needCompression() bool {
 	return false
 }
 
+// WriteHeader writes status code and Content-Encoding if compression writer is set and response needs compression.
 func (rw *rwWrapper) WriteHeader(statusCode int) {
 	if rw.ct != "" && rw.needCompression() {
 		rw.ResponseWriter.Header().Set("Content-Encoding", rw.ct)
@@ -74,11 +84,13 @@ func (rw *rwWrapper) WriteHeader(statusCode int) {
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
+// HandlerFunc sets upstream middleware handler.
 func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
 
+// ServeHTTP wraps http response writer to compression writer for upstream handlers.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := newResponseWrapper(w, r.Header.Get("Accept-Encoding"))
 	defer func() {

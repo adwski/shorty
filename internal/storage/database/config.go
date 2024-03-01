@@ -141,6 +141,7 @@ func newTracer(l *zap.Logger, pid uint32) *tracer {
 	}
 }
 
+// Write writes trace string as one log message.
 func (t *tracer) Write(b []byte) (int, error) {
 	t.log.Debug("db trace",
 		zap.String("trace", string(b)))

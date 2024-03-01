@@ -1,3 +1,10 @@
+// Package auth implements authentication middleware.
+//
+// It uses imported authenticator to handle jwt cookies.
+// User object is propagated via request context.
+//
+// Middleware guarantees that user object will always exist in context,
+// either new or parsed from cookie.
 package auth
 
 import (
@@ -10,12 +17,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Middleware is authentication middleware.
 type Middleware struct {
 	*authorizer.Auth
 	handler http.Handler
 	log     *zap.Logger
 }
 
+// New creates auth middleware.
 func New(logger *zap.Logger, jwtSecret string) *Middleware {
 	return &Middleware{
 		Auth: authorizer.New(jwtSecret),
@@ -23,6 +32,9 @@ func New(logger *zap.Logger, jwtSecret string) *Middleware {
 	}
 }
 
+// ServeHTTP implements auth flow for incoming request.
+// If jwt cookie is present and valid, user is added to request context.
+// In other cases new user is generated.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requestID, ok := session.GetRequestID(r.Context())
 	if !ok {
@@ -65,7 +77,8 @@ func (mw *Middleware) createUserAndCookie() (*user.User, *http.Cookie, error) {
 	return u, sessionCookie, nil
 }
 
-func (mw *Middleware) HandleFunc(h http.Handler) http.Handler {
+// HandlerFunc sets upstream middleware handler.
+func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 	mw.handler = h
 	return mw
 }
