@@ -73,7 +73,7 @@ func TestMiddleware(t *testing.T) {
 			}
 
 			s := &stub{}
-			mw.HandleFunc(s)
+			mw.HandlerFunc(s)
 			w := httptest.NewRecorder()
 			mw.ServeHTTP(w, r)
 			resp := w.Result()

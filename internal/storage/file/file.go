@@ -1,3 +1,6 @@
+// Package file implements in-memory storage with file persistence.
+//
+// It utilizes Memory storage and wraps file persistence around it.
 package file
 
 import (
@@ -31,7 +34,7 @@ const (
 // File is a simple in-memory store with file persistence.
 // Saving into file is done in background without affecting
 // Get/Store operations. Since file is completely rewritten on each
-// interval, this store is not suited for large quantities of records.
+// interval this store is not suited for large quantities of records.
 type File struct {
 	*memory.Memory
 	log *zap.Logger
@@ -52,11 +55,14 @@ type File struct {
 	shutdown atomic.Bool
 }
 
+// Config is file storage configuration.
 type Config struct {
 	Logger   *zap.Logger
 	FilePath string
 }
 
+// New create file storage. If file path in configuration is pointing to valid
+// file with data saved before, it will be loaded to in-memory store.
 func New(ctx context.Context, cfg *Config) (*File, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
@@ -91,11 +97,13 @@ func New(ctx context.Context, cfg *Config) (*File, error) {
 	return s, nil
 }
 
+// Close stops signal persistence loop to stop and blocks until all persistence operations are finished.
 func (s *File) Close() {
 	s.done <- struct{}{}
 	<-s.finish
 }
 
+// Store stores shortened URL.
 func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
 	if s.shutdown.Load() {
 		return "", errors.New("storage is shutting down")
@@ -107,6 +115,7 @@ func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (str
 	return "", nil
 }
 
+// StoreBatch stores batch of shortened URLs.
 func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	if s.shutdown.Load() {
 		return errors.New("storage is shutting down")
@@ -118,6 +127,7 @@ func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 	return nil
 }
 
+// DeleteUserURLs deletes batch of user urls.
 func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
 	if s.shutdown.Load() {
 		return 0, errors.New("storage is shutting down")

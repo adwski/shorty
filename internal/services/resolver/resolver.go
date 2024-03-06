@@ -1,3 +1,5 @@
+// Package resolver implements shortened URLs redirects.
+// It's independent of shortener service and potentially could be used separately.
 package resolver
 
 import (
@@ -12,6 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Storage is URL storage used by resolver.
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
 }
@@ -23,11 +26,13 @@ type Service struct {
 	log   *zap.Logger
 }
 
+// Config is resolver service config.
 type Config struct {
 	Store  Storage
 	Logger *zap.Logger
 }
 
+// New creates new resolver service.
 func New(cfg *Config) *Service {
 	return &Service{
 		store: cfg.Store,

@@ -25,6 +25,7 @@ const (
 	defaultHealthCheckPeriod        = 3 * time.Second
 )
 
+// Config holds Database configuration params.
 type Config struct {
 	Logger  *zap.Logger
 	DSN     string
@@ -32,6 +33,7 @@ type Config struct {
 	Trace   bool
 }
 
+// New create new Database connector using Config.
 func New(ctx context.Context, cfg *Config) (*Database, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("nil logger")
@@ -139,6 +141,7 @@ func newTracer(l *zap.Logger, pid uint32) *tracer {
 	}
 }
 
+// Write writes trace string as one log message.
 func (t *tracer) Write(b []byte) (int, error) {
 	t.log.Debug("db trace",
 		zap.String("trace", string(b)))

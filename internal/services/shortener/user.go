@@ -14,10 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type DeleteResponse struct {
-	Deleted int64 `json:"deleted"`
-}
-
+// DeleteURLs processes batch delete request.
+// URLs are pushed to flusher queue and deleted asynchronously.
 func (svc *Service) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	u, reqID, err := session.GetUserAndReqID(r.Context())
 	if err != nil {
@@ -75,6 +73,7 @@ func (svc *Service) deleteURLs(ctx context.Context, urls []storage.URL) {
 		zap.Int64("affected", affected))
 }
 
+// GetURLs retrieves all urls created by one user.
 func (svc *Service) GetURLs(w http.ResponseWriter, r *http.Request) {
 	u, reqID, err := session.GetUserAndReqID(r.Context())
 	if err != nil {

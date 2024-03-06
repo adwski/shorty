@@ -1,3 +1,4 @@
+// Package auth implements user authenticator.
 package auth
 
 import (
@@ -16,19 +17,23 @@ const (
 	defaultJWTCookieExpiration = 24 * time.Hour
 )
 
+// Claims is jwt token claims.
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID string `json:"user_id,omitempty"`
 }
 
+// Auth is authenticator component providing hi level user operations.
 type Auth struct {
 	jwtSecret string
 }
 
+// New creates authenticator.
 func New(jwtSecret string) *Auth {
 	return &Auth{jwtSecret: jwtSecret}
 }
 
+// GetUser retrieves user object from cookie value of incoming http request.
 func (a *Auth) GetUser(r *http.Request) (*user.User, error) {
 	sessionCookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
@@ -36,6 +41,18 @@ func (a *Auth) GetUser(r *http.Request) (*user.User, error) {
 	}
 
 	return a.getUserFromJWT(sessionCookie.Value)
+}
+
+// CreateJWTCookie creates new cookie for specified user. Cookie values will have newly generated jwt token.
+func (a *Auth) CreateJWTCookie(u *user.User) (*http.Cookie, error) {
+	token, err := a.newToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create auth token: %w", err)
+	}
+	return &http.Cookie{
+		Name:  sessionCookieName,
+		Value: token,
+	}, nil
 }
 
 func (a *Auth) getUserFromJWT(signedToken string) (*user.User, error) {
@@ -64,17 +81,6 @@ func (a *Auth) getUserFromJWT(signedToken string) (*user.User, error) {
 	default:
 		return user.NewWithID(claims.UserID), nil
 	}
-}
-
-func (a *Auth) CreateJWTCookie(u *user.User) (*http.Cookie, error) {
-	token, err := a.newToken(u)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create auth token: %w", err)
-	}
-	return &http.Cookie{
-		Name:  sessionCookieName,
-		Value: token,
-	}, nil
 }
 
 func (a *Auth) newToken(u *user.User) (string, error) {

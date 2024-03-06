@@ -19,10 +19,12 @@ const (
 	headerContentType = "Content-Type"
 )
 
+// ShortenRequest is single URL shorten request.
 type ShortenRequest struct {
 	URL string `json:"url"`
 }
 
+// ShortenResponse is a single URL shorten response.
 type ShortenResponse struct {
 	Result string `json:"result"`
 }

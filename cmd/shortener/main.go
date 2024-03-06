@@ -10,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/adwski/shorty/internal/profiler"
+
 	"github.com/adwski/shorty/internal/app"
 	"github.com/adwski/shorty/internal/app/config"
 	"go.uber.org/zap"
@@ -55,6 +57,16 @@ func run(logger *zap.Logger, cfg *config.Shorty) error {
 		errc   = make(chan error)
 		shorty = app.NewShorty(logger, store, cfg)
 	)
+
+	if cfg.PprofServerAddr != "" {
+		prof := profiler.New(&profiler.Config{
+			Logger:        logger,
+			ListenAddress: cfg.PprofServerAddr,
+		})
+		wg.Add(1)
+		go prof.Run(ctx, wg, errc)
+	}
+
 	wg.Add(1)
 	go shorty.Run(ctx, wg, errc)
 

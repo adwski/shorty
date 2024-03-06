@@ -29,7 +29,7 @@ shortenertests: build
                       -server-port=$$(random unused-port) \
                       -file-storage-path=/tmp/short-url-db-test.json || exit 1 ; \
 	done
-	for num in 10 11 12 13 14 15; do \
+	for num in 10 11 12 13 14 15 16 17 18; do \
 		shortenertestbeta -test.v -test.run=^TestIteration$$num$$ \
                       -binary-path=cmd/shortener/shortener \
                       -source-path=. \
@@ -76,3 +76,9 @@ docker-dev:
 docker-dev-clean:
 	cd docker ;\
 	docker compose down -v
+
+.PHONY: godoc
+godoc:
+	@echo "spawning godoc"
+	@echo "navigate to http://localhost:8111/pkg/github.com/adwski/shorty/?m=all"
+	godoc -http=:8111
