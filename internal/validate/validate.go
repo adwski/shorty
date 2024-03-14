@@ -1,3 +1,4 @@
+// Package validate contains various http request validation functions.
 package validate
 
 import (

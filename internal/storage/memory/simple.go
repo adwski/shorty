@@ -52,7 +52,7 @@ func (m *Memory) Get(_ context.Context, key string) (string, error) {
 func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if u, ok := m.DB[url.Short]; ok && !(overwrite || u.Deleted) {
+	if u, ok := m.DB[url.Short]; ok && !overwrite && !u.Deleted {
 		return "", storage.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()

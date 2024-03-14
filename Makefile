@@ -1,3 +1,7 @@
+COMMIT = $(shell git rev-parse HEAD)
+VERSION = v0.0.1
+DATETIME = $(shell date -u +"%Y-%m-%dT%H:%M:%S%z")
+
 .PHONY: mock
 mock:
 	find . -type d -name "mock*" -exec rm -rf {} +
@@ -9,7 +13,8 @@ unittests: mock
 
 .PHONY: build
 build:
-	go build -gcflags "-m" -race -o ./cmd/shortener/shortener ./cmd/shortener/*.go
+	go build -ldflags "-X 'main.buildVer=$(VERSION)' -X 'main.buildCommit=$(COMMIT)' -X 'main.buildTime=$(DATETIME)'" \
+		-gcflags "-m" -race -o ./cmd/shortener/shortener ./cmd/shortener/*.go
 
 # Run it like this
 # > make shortenertest TESTNUM=7
@@ -43,6 +48,7 @@ statictest:
 .PHONY: lint
 lint:
 	golangci-lint run ./...
+	go run cmd/staticlint/main.go ./...
 
 .PHONY: goimports
 goimports:
@@ -58,9 +64,16 @@ integration-tests: docker-dev db-tests shortenertests
 db-tests:
 	go test ./... -v -count=1 -cover --tags=integration -run=TestDatabase*
 
+.PHONY: test-all-cover
+test-all-cover: docker-dev
+	go test ./... -v -count=1 -cover -coverpkg=./... -coverprofile=profile.cov --tags=integration
+	go tool cover -func=profile.cov
+
 .PHONY: image-release
 image-release:
-	docker build -t shorty:release --target release -f docker/Dockerfile .
+	docker build -t shorty:release \
+		--build-arg "COMMIT=$(COMMIT)" --build-arg "VERSION=$(VERSION)" \
+		--target release -f docker/Dockerfile .
 
 .PHONY: image-dev
 image-dev:

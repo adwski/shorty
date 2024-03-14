@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"syscall"
 
@@ -15,6 +16,13 @@ import (
 	"github.com/adwski/shorty/internal/app"
 	"github.com/adwski/shorty/internal/app/config"
 	"go.uber.org/zap"
+)
+
+var (
+	buildVer    = "N/A"
+	buildGoVer  = "N/A"
+	buildTime   = "N/A"
+	buildCommit = "N/A"
 )
 
 func main() {
@@ -32,6 +40,16 @@ func main() {
 		defer os.Exit(1)
 		return
 	}
+
+	if bInfo, ok := debug.ReadBuildInfo(); ok {
+		buildGoVer = bInfo.GoVersion
+	}
+
+	logger.Debug("build info",
+		zap.String("version", buildVer),
+		zap.String("go", buildGoVer),
+		zap.String("time", buildTime),
+		zap.String("commit", buildCommit))
 
 	cfg, err := config.New()
 	if err != nil {
