@@ -25,43 +25,47 @@ func run(pass *analysis.Pass) (any, error) {
 		if !strings.HasSuffix(pass.Fset.Position(file.Pos()).Filename, ".go") {
 			continue
 		}
-		ast.Inspect(file, newInspector().inspectFunc(pass))
+		ast.Inspect(file, inspect(pass))
 	}
 	return nil, nil //nolint:nilnil // looks like it's a pretty common return behaviour in analyzers.
 }
 
-type inspector struct {
-	insideMainFunc bool
-}
-
-func newInspector() *inspector {
-	return &inspector{}
-}
-
-func (i *inspector) inspectFunc(pass *analysis.Pass) func(node ast.Node) bool {
-	exprStmt := func(x *ast.ExprStmt) {
-		if call, ok := x.X.(*ast.CallExpr); ok {
-			if s, ok := call.Fun.(*ast.SelectorExpr); ok {
-				if s.Sel.Name == "Exit" && i.insideMainFunc {
-					pass.Reportf(call.Pos(), "direct os.Exit call in main func")
-				}
-			}
-		}
-	}
-	funcDecl := func(x *ast.FuncDecl) {
-		if x.Name.String() == "main" {
-			i.insideMainFunc = true
-		} else {
-			i.insideMainFunc = false
-		}
-	}
+func inspect(pass *analysis.Pass) func(node ast.Node) bool {
+	var (
+		insideMainFunc bool
+	)
 	return func(node ast.Node) bool {
 		switch x := node.(type) {
 		case *ast.ExprStmt:
-			exprStmt(x)
+			inspectExpr(x, pass, &insideMainFunc)
 		case *ast.FuncDecl:
-			funcDecl(x)
+			if x.Name.String() == "main" {
+				insideMainFunc = true
+			} else {
+				insideMainFunc = false
+			}
 		}
 		return true
+	}
+}
+
+func inspectExpr(x *ast.ExprStmt, pass *analysis.Pass, insideMainFunc *bool) {
+	if !*insideMainFunc {
+		return
+	}
+	call, ok := x.X.(*ast.CallExpr)
+	if !ok {
+		return
+	}
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || !selector.Sel.IsExported() {
+		return
+	}
+	pkg, ok := selector.X.(*ast.Ident)
+	if !ok {
+		return
+	}
+	if selector.Sel.Name == "Exit" && pkg.String() == "os" {
+		pass.Reportf(call.Pos(), "direct os.Exit call in main func")
 	}
 }
