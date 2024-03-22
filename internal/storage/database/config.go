@@ -65,7 +65,7 @@ func New(ctx context.Context, cfg *Config) (*Database, error) {
 }
 
 func preparePoolConfig(pCfg *pgxpool.Config) {
-	pCfg.ConnConfig.Config.ConnectTimeout = defaultConnectTimeout
+	pCfg.ConnConfig.ConnectTimeout = defaultConnectTimeout
 
 	// Choosing this mode because:
 	// - Compatible with connection pollers

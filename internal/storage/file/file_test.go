@@ -115,7 +115,7 @@ func TestStore_Get(t *testing.T) {
 				Memory: memory.New(),
 			}
 			for k, v := range tt.args.db {
-				fs.Memory.DB[k] = db.Record{
+				fs.DB[k] = db.Record{
 					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,
@@ -189,7 +189,7 @@ func TestStore_Store(t *testing.T) {
 				Memory: memory.New(),
 			}
 			for k, v := range tt.args.beforeDB {
-				fs.Memory.DB[k] = db.Record{
+				fs.DB[k] = db.Record{
 					UUID:        uuid.Must(uuid.NewV4()).String(),
 					ShortURL:    k,
 					OriginalURL: v,

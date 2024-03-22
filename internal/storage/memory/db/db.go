@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	"github.com/adwski/shorty/internal/user"
-
 	"github.com/gofrs/uuid/v5"
 )
 
