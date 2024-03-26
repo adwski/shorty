@@ -51,15 +51,16 @@ type Shorty struct {
 	server    *http.Server
 	shortener *shortener.Service
 	host      string
+	tls       bool
 }
 
 // NewShorty creates Shorty instance from config.
-func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty {
+func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) *Shorty {
 	shortenerSvc := shortener.New(&shortener.Config{
 		Store:          storage,
 		ServedScheme:   cfg.ServedScheme,
 		RedirectScheme: cfg.RedirectScheme,
-		Host:           cfg.Host,
+		Host:           cfg.ServedHost,
 		Logger:         logger,
 		PathLength:     defaultPathLength,
 	})
@@ -85,9 +86,11 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Shorty) *Shorty 
 
 	return &Shorty{
 		log:       logger.With(zap.String("component", "api")),
-		host:      cfg.Host,
+		host:      cfg.ServedHost,
 		shortener: shortenerSvc,
+		tls:       cfg.GetTLSConfig() != nil,
 		server: &http.Server{
+			TLSConfig:         cfg.GetTLSConfig(),
 			Addr:              cfg.ListenAddr,
 			ReadTimeout:       defaultReadTimeout,
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
@@ -112,7 +115,12 @@ func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) 
 		zap.String("host", sh.host))
 	errSrv := make(chan error)
 	go func(errc chan error) {
-		errc <- sh.server.ListenAndServe()
+		if sh.tls {
+			// cert and key are provided via tls.Config
+			errc <- sh.server.ListenAndServeTLS("", "")
+		} else {
+			errc <- sh.server.ListenAndServe()
+		}
 	}(errSrv)
 
 	select {
