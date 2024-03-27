@@ -61,13 +61,14 @@ func main() {
 }
 
 func run(logger *zap.Logger, cfg *config.Config) error {
-	var (
-		ctx, cancel = signal.NotifyContext(context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-			syscall.SIGQUIT)
-		store, err = initStorage(ctx, logger, cfg.Storage)
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
 	)
+	defer cancel()
+
+	store, err := initStorage(ctx, logger, cfg.Storage)
 	if err != nil {
 		return fmt.Errorf("cannot configure storage: %w", err)
 	}
