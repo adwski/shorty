@@ -36,9 +36,10 @@ func (cfg *Config) GetTLSConfig() *tls.Config {
 
 // TLS holds Shorty tls configuration params.
 type TLS struct {
-	CertPath string `json:"cert"`
-	KeyPath  string `json:"key"`
-	Enable   bool   `json:"enable"`
+	CertPath      string `json:"cert"`
+	KeyPath       string `json:"key"`
+	Enable        bool   `json:"enable"`
+	UseSelfSigned bool   `json:"self_signed"`
 }
 
 // Storage holds Shorty storage config params.
@@ -88,7 +89,7 @@ func New(logger *zap.Logger) (*Config, error) {
 		// Create TLS Config.
 		// We must call it after base URL is parsed.
 		if err = cfg.createTLSConfig(logger); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("tls config error: %w", err)
 		}
 	}
 
@@ -107,10 +108,6 @@ func (cfg *Config) parseBaseURL() error {
 
 func (cfg *Config) createTLSConfig(logger *zap.Logger) error {
 	var err error
-	cfg.tls, err = getTLSConfig(
-		logger,
-		cfg.TLS.KeyPath,
-		cfg.TLS.CertPath,
-		cfg.ServedHost)
+	cfg.tls, err = getTLSConfig(logger, cfg.TLS, cfg.ServedHost)
 	return err
 }

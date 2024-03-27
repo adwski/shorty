@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -29,17 +30,17 @@ var (
 	caSubjectKeyIdentifier = []byte{1, 2, 3, 4, 6}
 )
 
-func getTLSConfig(logger *zap.Logger, keyPath, certPath, host string) (*tls.Config, error) {
-	if keyPath == "" && certPath == "" {
+func getTLSConfig(logger *zap.Logger, cfg *TLS, host string) (*tls.Config, error) {
+	if cfg.UseSelfSigned {
 		// generate self signed
-		logger.Warn("tls was enabled with empty key and cert, will use self-signed cert")
+		logger.Warn("generating self-signed cert")
 		logger.Warn("self signed cert will have loopback ip addresses and served host as SANs")
 		return getSelfSignedTLSConfig(host)
 	}
 
-	if keyPath != "" && certPath != "" {
+	if cfg.KeyPath != "" && cfg.CertPath != "" {
 		// use provided key and cert
-		cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+		cert, err := tls.LoadX509KeyPair(cfg.CertPath, cfg.KeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("cannot load x509 cert and key: %w", err)
 		}
@@ -50,14 +51,14 @@ func getTLSConfig(logger *zap.Logger, keyPath, certPath, host string) (*tls.Conf
 		}, nil
 	}
 
-	logger.Error("specify key and cert or leave them both empty to generate self signed cert",
-		zap.String("key", keyPath),
-		zap.String("cert", certPath))
-
-	if keyPath == "" {
-		return nil, fmt.Errorf("key path is empty")
+	var err error
+	if cfg.KeyPath == "" {
+		err = errors.Join(err, fmt.Errorf("key path is empty"))
 	}
-	return nil, fmt.Errorf("cert path is empty")
+	if cfg.CertPath == "" {
+		err = errors.Join(err, fmt.Errorf("cert path is empty"))
+	}
+	return nil, err
 }
 
 func getSelfSignedTLSConfig(cn string) (*tls.Config, error) {

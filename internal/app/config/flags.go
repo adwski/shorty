@@ -42,6 +42,7 @@ func newFromFlags() (*Config, error) {
 
 	fs.BoolVarP(&cfg.TLS.Enable, "tls_enable", "s", false,
 		"enable https, use tls_cert and tls_key args to provide certificate and key")
+	fs.BoolVar(&cfg.TLS.UseSelfSigned, "self_signed", false, "generate self signed cert on startup")
 	fs.StringVar(&cfg.TLS.KeyPath, "tls_key", "", "path to private key")
 	fs.StringVar(&cfg.TLS.CertPath, "tls_cert", "", "path to certificate")
 

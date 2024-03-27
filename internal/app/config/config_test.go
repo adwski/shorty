@@ -25,6 +25,7 @@ var testConfig = `
   },
   "tls": {
     "enable": true,
+    "self_signed": true,
     "cert": "%s",
     "key": "%s"
   },
@@ -164,6 +165,7 @@ func TestNew(t *testing.T) {
 	assert.True(t, cfg.Storage.TraceDB)
 
 	assert.True(t, cfg.TLS.Enable)
+	assert.True(t, cfg.TLS.UseSelfSigned)
 	assert.Equal(t, fCert.Name(), cfg.TLS.CertPath)
 	assert.Equal(t, fKey.Name(), cfg.TLS.KeyPath)
 

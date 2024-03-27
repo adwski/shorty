@@ -30,6 +30,7 @@ func mergeTLS(dst, src *Config) {
 		dst.TLS = src.TLS
 	} else if src.TLS != nil {
 		mergeBool(&dst.TLS.Enable, &src.TLS.Enable)
+		mergeBool(&dst.TLS.UseSelfSigned, &src.TLS.UseSelfSigned)
 		mergeString(&dst.TLS.KeyPath, &src.TLS.KeyPath)
 		mergeString(&dst.TLS.CertPath, &src.TLS.CertPath)
 	}
