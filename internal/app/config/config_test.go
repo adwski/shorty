@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -10,9 +11,9 @@ import (
 )
 
 const (
-	testConfigPath = "/tmp/shorty-test-cfg.json"
-	testCertPath   = "/tmp/shorty-test-cert.pem"
-	testKeyPath    = "/tmp/shorty-test-key.pem"
+	testFilePatternConfig = "shorty-test-cfg-*.json"
+	testFilePatternCert   = "shorty-test-cert-*.pem"
+	testFilePatternKey    = "shorty-test-key-*.pem"
 )
 
 var testConfig = `
@@ -24,8 +25,8 @@ var testConfig = `
   },
   "tls": {
     "enable": true,
-    "cert": "/tmp/shorty-test-cert.pem",
-    "key": "/tmp/shorty-test-key.pem"
+    "cert": "%s",
+    "key": "%s"
   },
   "listen_addr": "0.0.0.0:1111",
   "pprof_listen_addr": "0.0.0.0:2222",
@@ -129,14 +130,25 @@ zpSraVpUe1NHT2OlJQOc
 `
 
 func TestNew(t *testing.T) {
-	err := os.WriteFile(testConfigPath, []byte(testConfig), os.ModePerm)
+	fConfig, err := os.CreateTemp("", testFilePatternConfig)
 	require.NoError(t, err)
-	err = os.WriteFile(testKeyPath, []byte(testKey), os.ModePerm)
+	defer func() { _ = os.Remove(fConfig.Name()) }()
+	fCert, err := os.CreateTemp("", testFilePatternCert)
 	require.NoError(t, err)
-	err = os.WriteFile(testCertPath, []byte(testCert), os.ModePerm)
+	defer func() { _ = os.Remove(fCert.Name()) }()
+	fKey, err := os.CreateTemp("", testFilePatternKey)
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(fKey.Name()) }()
+
+	configBytes := []byte(fmt.Sprintf(testConfig, fCert.Name(), fKey.Name()))
+	err = os.WriteFile(fConfig.Name(), configBytes, os.ModePerm)
+	require.NoError(t, err)
+	err = os.WriteFile(fKey.Name(), []byte(testKey), os.ModePerm)
+	require.NoError(t, err)
+	err = os.WriteFile(fCert.Name(), []byte(testCert), os.ModePerm)
 	require.NoError(t, err)
 
-	t.Setenv("CONFIG", testConfigPath)
+	t.Setenv("CONFIG", fConfig.Name())
 
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
@@ -152,8 +164,8 @@ func TestNew(t *testing.T) {
 	assert.True(t, cfg.Storage.TraceDB)
 
 	assert.True(t, cfg.TLS.Enable)
-	assert.Equal(t, testCertPath, cfg.TLS.CertPath)
-	assert.Equal(t, testKeyPath, cfg.TLS.KeyPath)
+	assert.Equal(t, fCert.Name(), cfg.TLS.CertPath)
+	assert.Equal(t, fKey.Name(), cfg.TLS.KeyPath)
 
 	assert.Equal(t, "0.0.0.0:1111", cfg.ListenAddr)
 	assert.Equal(t, "0.0.0.0:2222", cfg.PprofServerAddr)
@@ -162,8 +174,4 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "http", cfg.ServedScheme)
 	assert.Equal(t, "qweqwe", cfg.JWTSecret)
 	assert.True(t, cfg.TrustRequestID)
-
-	_ = os.Remove(testConfigPath)
-	_ = os.Remove(testKeyPath)
-	_ = os.Remove(testCertPath)
 }
