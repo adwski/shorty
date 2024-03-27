@@ -59,6 +59,8 @@ func New(logger *zap.Logger) (*Config, error) {
 		return nil, err
 	}
 
+	envOverride("CONFIG", &cfgFromArgs.configFilePath)
+
 	// Read config file
 	if cfgFromArgs.configFilePath != "" {
 		cfgFromFile, errCfg := newFromFile(cfgFromArgs.configFilePath)
@@ -70,6 +72,11 @@ func New(logger *zap.Logger) (*Config, error) {
 		cfg = cfgFromFile
 	} else {
 		cfg = cfgFromArgs
+	}
+
+	// Merge Envs
+	if err = mergeEnvs(cfg); err != nil {
+		return nil, err
 	}
 
 	// Parse server base URL

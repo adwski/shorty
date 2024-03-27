@@ -49,19 +49,5 @@ func newFromFlags() (*Config, error) {
 		return nil, fmt.Errorf("cannot parse command line arguments: %w", err)
 	}
 
-	//--------------------------------------------------
-	// Check env vars
-	//--------------------------------------------------
-	envOverride("CONFIG", &cfg.configFilePath)
-	envOverride("SERVER_ADDRESS", &cfg.ListenAddr)
-	envOverride("PPROF_ADDRESS", &cfg.PprofServerAddr)
-	envOverride("BASE_URL", &cfg.BaseURL)
-	envOverride("FILE_STORAGE_PATH", &cfg.Storage.FileStoragePath)
-	envOverride("DATABASE_DSN", &cfg.Storage.DatabaseDSN)
-	envOverride("JWT_SECRET", &cfg.JWTSecret)
-	if errV := envOverrideBool("ENABLE_HTTPS", &cfg.TLS.Enable); errV != nil {
-		return nil, errV
-	}
-
 	return cfg, nil
 }
