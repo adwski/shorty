@@ -72,8 +72,8 @@ func TestShorty(t *testing.T) {
 					return "", nil
 				})
 
-			cfg := &config.Shorty{
-				Host:         "xxx.yyy",
+			cfg := &config.Config{
+				ServedHost:   "xxx.yyy",
 				ServedScheme: "http",
 			}
 			shorty := NewShorty(logger, st, cfg)
@@ -117,7 +117,7 @@ func TestShorty(t *testing.T) {
 			require.NoError(t, err)
 			u, errU := url.Parse(string(urlBody))
 			require.NoError(t, errU)
-			assert.Equal(t, cfg.Host, u.Host)
+			assert.Equal(t, cfg.ServedHost, u.Host)
 			assert.Equal(t, cfg.ServedScheme, u.Scheme)
 			require.NotEmpty(t, u.Path)
 			require.NotEqual(t, "/", u.Path)

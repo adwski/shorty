@@ -2,88 +2,112 @@
 package config
 
 import (
-	"flag"
+	"crypto/tls"
 	"fmt"
 	"net/url"
-	"os"
+
+	"go.uber.org/zap"
 )
 
-// Shorty holds Shorty app config params.
-type Shorty struct {
-	StorageConfig   *Storage
-	ListenAddr      string
-	Host            string
-	RedirectScheme  string
-	ServedScheme    string
-	JWTSecret       string
-	PprofServerAddr string
-	TrustRequestID  bool
+// Config holds Shorty app config params.
+type Config struct {
+	Storage *Storage `json:"storage"`
+	TLS     *TLS     `json:"tls"`
+
+	tls            *tls.Config
+	configFilePath string
+
+	ListenAddr      string `json:"listen_addr"`
+	BaseURL         string `json:"base_url"`
+	RedirectScheme  string `json:"redirect_scheme"`
+	JWTSecret       string `json:"jwt_secret"`
+	PprofServerAddr string `json:"pprof_listen_addr"`
+	ServedHost      string `json:"-"`
+	ServedScheme    string `json:"-"`
+
+	TrustRequestID bool `json:"trust_request_id"`
+}
+
+// GetTLSConfig returns crypto/tls.Config if tls was enabled in configuration,
+// otherwise it will return nil.
+func (cfg *Config) GetTLSConfig() *tls.Config {
+	return cfg.tls
+}
+
+// TLS holds Shorty tls configuration params.
+type TLS struct {
+	CertPath      string `json:"cert"`
+	KeyPath       string `json:"key"`
+	Enable        bool   `json:"enable"`
+	UseSelfSigned bool   `json:"self_signed"`
 }
 
 // Storage holds Shorty storage config params.
 type Storage struct {
-	DatabaseDSN     string
-	FileStoragePath string
-	TraceDB         bool
+	DatabaseDSN     string `json:"database_dsn"`
+	FileStoragePath string `json:"file_storage_path"`
+	TraceDB         bool   `json:"trace_db"`
 }
 
-// New creates Shorty config using command line argument and environment variables.
-func New() (*Shorty, error) {
-	var (
-		listenAddr      = flag.String("a", ":8080", "listen address")
-		baseURL         = flag.String("b", "http://localhost:8080", "base server URL")
-		fileStoragePath = flag.String("f", "/tmp/short-url-db.json", "file storage path")
-		databaseDSN     = flag.String("d", "", "postgres connection DSN")
-		jwtSecret       = flag.String("jwt_secret", "supersecret", "jwt cookie secret key")
-		redirectScheme  = flag.String("redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
-		traceDB         = flag.Bool("trace_db", false, "print db wire protocol traces")
-		trustRequestID  = flag.Bool("trust_request_id", false, "trust X-Request-Id header or generate unique requestId")
-		profilerAddr    = flag.String("pprof_addr", "", "pprof server listen address, it will not start if left empty")
-	)
-	flag.Parse()
+// New creates Shorty config using config file, command line argument
+// and environment variables in mentioned order.
+func New(logger *zap.Logger) (*Config, error) {
+	var cfg *Config
 
-	//--------------------------------------------------
-	// Check env vars
-	//--------------------------------------------------
-	envOverride("SERVER_ADDRESS", listenAddr)
-	envOverride("PPROF_ADDRESS", profilerAddr)
-	envOverride("BASE_URL", baseURL)
-	envOverride("FILE_STORAGE_PATH", fileStoragePath)
-	envOverride("DATABASE_DSN", databaseDSN)
-	envOverride("JWT_SECRET", jwtSecret)
-
-	//--------------------------------------------------
-	// Parse server URL
-	//--------------------------------------------------
-	bURL, err := url.Parse(*baseURL)
+	// Read flags
+	cfgFromArgs, err := newFromFlags()
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse base server URL: %w", err)
+		return nil, err
 	}
 
-	//--------------------------------------------------
-	// Create config
-	//--------------------------------------------------
-	return &Shorty{
-		ListenAddr:      *listenAddr,
-		Host:            bURL.Host,
-		RedirectScheme:  *redirectScheme,
-		ServedScheme:    bURL.Scheme,
-		JWTSecret:       *jwtSecret,
-		TrustRequestID:  *trustRequestID,
-		PprofServerAddr: *profilerAddr,
-		StorageConfig: &Storage{
-			TraceDB:         *traceDB,
-			DatabaseDSN:     *databaseDSN,
-			FileStoragePath: *fileStoragePath,
-		},
-	}, nil
+	envOverride("CONFIG", &cfgFromArgs.configFilePath)
+
+	// Read config file
+	if cfgFromArgs.configFilePath != "" {
+		cfgFromFile, errCfg := newFromFile(cfgFromArgs.configFilePath)
+		if errCfg != nil {
+			return nil, errCfg
+		}
+		// Merge configs
+		merge(cfgFromFile, cfgFromArgs)
+		cfg = cfgFromFile
+	} else {
+		cfg = cfgFromArgs
+	}
+
+	// Merge Envs
+	if err = mergeEnvs(cfg); err != nil {
+		return nil, err
+	}
+
+	// Parse server base URL
+	if err = cfg.parseBaseURL(); err != nil {
+		return nil, err
+	}
+
+	if cfg.TLS.Enable {
+		// Create TLS Config.
+		// We must call it after base URL is parsed.
+		if err = cfg.createTLSConfig(logger); err != nil {
+			return nil, fmt.Errorf("tls config error: %w", err)
+		}
+	}
+
+	return cfg, nil
 }
 
-func envOverride(name string, param *string) {
-	if param == nil {
-		return
+func (cfg *Config) parseBaseURL() error {
+	baseURL, err := url.Parse(cfg.BaseURL)
+	if err != nil {
+		return fmt.Errorf("cannot parse base server URL: %w", err)
 	}
-	if val, ok := os.LookupEnv(name); ok {
-		*param = val
-	}
+	cfg.ServedHost = baseURL.Host
+	cfg.ServedScheme = baseURL.Scheme
+	return nil
+}
+
+func (cfg *Config) createTLSConfig(logger *zap.Logger) error {
+	var err error
+	cfg.tls, err = getTLSConfig(logger, cfg.TLS, cfg.ServedHost)
+	return err
 }

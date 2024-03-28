@@ -11,10 +11,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/adwski/shorty/internal/profiler"
-
 	"github.com/adwski/shorty/internal/app"
 	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/profiler"
 	"go.uber.org/zap"
 )
 
@@ -51,7 +50,7 @@ func main() {
 		zap.String("time", buildTime),
 		zap.String("commit", buildCommit))
 
-	cfg, err := config.New()
+	cfg, err := config.New(logger)
 	if err != nil {
 		logger.Fatal("cannot configure app", zap.Error(err))
 	}
@@ -61,11 +60,15 @@ func main() {
 	}
 }
 
-func run(logger *zap.Logger, cfg *config.Shorty) error {
-	var (
-		ctx, cancel = signal.NotifyContext(context.Background(), os.Interrupt)
-		store, err  = initStorage(ctx, logger, cfg.StorageConfig)
+func run(logger *zap.Logger, cfg *config.Config) error {
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
 	)
+	defer cancel()
+
+	store, err := initStorage(ctx, logger, cfg.Storage)
 	if err != nil {
 		return fmt.Errorf("cannot configure storage: %w", err)
 	}

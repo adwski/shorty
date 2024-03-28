@@ -3,6 +3,7 @@ module github.com/adwski/shorty
 go 1.21.1
 
 require (
+	dario.cat/mergo v1.0.0
 	github.com/brianvoe/gofakeit/v6 v6.26.3
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/gofrs/uuid/v5 v5.0.0
@@ -11,6 +12,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/sashamelentyev/interfacebloat v1.1.0
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/timonwong/loggercheck v0.9.4
 	go.uber.org/zap v1.26.0

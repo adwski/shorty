@@ -4,15 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"strconv"
 	"testing"
-	"time"
-
-	"github.com/adwski/shorty/internal/storage/memory"
-	"github.com/adwski/shorty/internal/storage/memory/db"
 
 	"github.com/adwski/shorty/internal/storage"
-
+	"github.com/adwski/shorty/internal/storage/memory"
+	"github.com/adwski/shorty/internal/storage/memory/db"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,9 +34,12 @@ func TestFileStore(t *testing.T) {
 			logger, err := zap.NewDevelopment()
 			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
-			storeFile := "/tmp/testFile" + strconv.Itoa(int(time.Now().Unix()))
+			fStore, err := os.CreateTemp("", "shorty-test-db-*.")
+			require.NoError(t, err)
+			defer func() { _ = os.Remove(fStore.Name()) }()
+
 			fs, err := New(ctx, &Config{
-				FilePath: storeFile,
+				FilePath: fStore.Name(),
 				Logger:   logger,
 			})
 			require.NoError(t, err)
@@ -64,7 +63,7 @@ func TestFileStore(t *testing.T) {
 				content []byte
 				rec     db.Record
 			)
-			content, err = os.ReadFile(storeFile)
+			content, err = os.ReadFile(fStore.Name())
 			require.NoError(t, err)
 			require.NotEmpty(t, content)
 			err = json.Unmarshal(content, &rec)
