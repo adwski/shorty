@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/adwski/shorty/internal/model"
+
 	"github.com/adwski/shorty/internal/user"
 	"github.com/gofrs/uuid/v5"
 )
@@ -26,6 +28,25 @@ func (db DB) Map() map[string]string {
 		kv[k] = v.OriginalURL
 	}
 	return kv
+}
+
+func (db DB) Stats() *model.StatsResponse {
+	var (
+		userCtr int
+		users   = make(map[string]bool, len(db))
+	)
+	for _, rec := range db {
+		if !users[rec.UserID] {
+			if !rec.Deleted {
+				users[rec.UserID] = true
+				userCtr++
+			}
+		}
+	}
+	return &model.StatsResponse{
+		URLs:  len(db),
+		Users: userCtr,
+	}
 }
 
 // Record is single shortened URL record.

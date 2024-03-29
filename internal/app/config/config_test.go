@@ -34,7 +34,12 @@ var testConfig = `
   "base_url": "http://qwe.asd",
   "redirect_scheme": "http",
   "jwt_secret": "qweqwe",
-  "trust_request_id": true
+  "trust_request_id": true,
+  "filter": {
+    "trusted_subnets": "1.1.0.0/16,fedc::/16",
+    "trust_x_forwarded_for": true,
+    "trust_x_real_ip": true
+  }
 }
 `
 
@@ -159,6 +164,11 @@ func TestNew(t *testing.T) {
 
 	assert.NotNil(t, cfg.GetTLSConfig())
 	assert.NotNil(t, cfg.Storage)
+	assert.NotNil(t, cfg.Filter)
+
+	assert.Equal(t, "1.1.0.0/16,fedc::/16", cfg.Filter.Subnets)
+	assert.True(t, cfg.Filter.TrustXFF)
+	assert.True(t, cfg.Filter.TrustXRealIP)
 
 	assert.Equal(t, "/qwe/qweasd", cfg.Storage.FileStoragePath)
 	assert.Equal(t, "postgres://qweasd.asd/db", cfg.Storage.DatabaseDSN)

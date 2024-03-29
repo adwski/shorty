@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Storage *Storage `json:"storage"`
 	TLS     *TLS     `json:"tls"`
+	Filter  *Filter  `json:"filter"`
 
 	tls            *tls.Config
 	configFilePath string
@@ -40,6 +41,13 @@ type TLS struct {
 	KeyPath       string `json:"key"`
 	Enable        bool   `json:"enable"`
 	UseSelfSigned bool   `json:"self_signed"`
+}
+
+// Filter holds ip filter config params.
+type Filter struct {
+	Subnets      string `json:"trusted_subnets"`
+	TrustXFF     bool   `json:"trust_x_forwarded_for"`
+	TrustXRealIP bool   `json:"trust_x_real_ip"`
 }
 
 // Storage holds Shorty storage config params.

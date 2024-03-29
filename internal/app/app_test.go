@@ -75,8 +75,10 @@ func TestShorty(t *testing.T) {
 			cfg := &config.Config{
 				ServedHost:   "xxx.yyy",
 				ServedScheme: "http",
+				Filter:       &config.Filter{},
 			}
-			shorty := NewShorty(logger, st, cfg)
+			shorty, err := NewShorty(logger, st, cfg)
+			require.NoError(t, err)
 
 			//-----------------------------------------------------
 			// Store URL
@@ -125,9 +127,7 @@ func TestShorty(t *testing.T) {
 			//-----------------------------------------------------
 			// Get redirect
 			//-----------------------------------------------------
-
 			r = httptest.NewRequest(http.MethodGet, u.Path, nil)
-
 			w = httptest.NewRecorder()
 
 			// Execute

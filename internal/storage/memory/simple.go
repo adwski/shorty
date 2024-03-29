@@ -7,6 +7,8 @@ import (
 	"maps"
 	"sync"
 
+	"github.com/adwski/shorty/internal/model"
+
 	"github.com/adwski/shorty/internal/storage/memory/db"
 	"github.com/gofrs/uuid/v5"
 
@@ -140,4 +142,9 @@ func (m *Memory) Dump() db.DB {
 // Ping does nothing. It's here just to comply to shortener interface.
 func (m *Memory) Ping(_ context.Context) error {
 	return nil
+}
+
+// Stats returns total number of unique urls and users.
+func (m *Memory) Stats(_ context.Context) (*model.StatsResponse, error) {
+	return m.DB.Stats(), nil
 }

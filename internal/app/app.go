@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -13,8 +14,10 @@ import (
 	"github.com/adwski/shorty/internal/app/config"
 	"github.com/adwski/shorty/internal/middleware/auth"
 	"github.com/adwski/shorty/internal/middleware/compress"
+	"github.com/adwski/shorty/internal/middleware/filter"
 	"github.com/adwski/shorty/internal/middleware/logging"
 	"github.com/adwski/shorty/internal/middleware/requestid"
+	"github.com/adwski/shorty/internal/model"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/services/status"
@@ -40,6 +43,7 @@ type Storage interface {
 	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
 	DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error)
 	Ping(ctx context.Context) error
+	Stats(ctx context.Context) (*model.StatsResponse, error)
 	Close()
 }
 
@@ -55,7 +59,7 @@ type Shorty struct {
 }
 
 // NewShorty creates Shorty instance from config.
-func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) *Shorty {
+func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) (*Shorty, error) {
 	shortenerSvc := shortener.New(&shortener.Config{
 		Store:          storage,
 		ServedScheme:   cfg.ServedScheme,
@@ -84,6 +88,17 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) *Shorty 
 	r.Get("/{path}", resolverSvc.Resolve)
 	r.Get("/ping", statusSvc.Ping)
 
+	filterMW, err := filter.New(&filter.Config{
+		Logger:             logger,
+		Subnets:            cfg.Filter.Subnets,
+		TrustXForwardedFor: cfg.Filter.TrustXFF,
+		TrustXRealIP:       cfg.Filter.TrustXRealIP,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot create filter middleware: %w", err)
+	}
+	r.With(filterMW.HandlerFunc).Get("/api/internal/stats", statusSvc.Stats)
+
 	return &Shorty{
 		log:       logger.With(zap.String("component", "api")),
 		host:      cfg.ServedHost,
@@ -99,7 +114,7 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) *Shorty 
 			ErrorLog:          log.New(newSrvLogger(logger), "", 0),
 			Handler:           r,
 		},
-	}
+	}, nil
 }
 
 // Run starts internal web server and returned only wen ListenAndServe returns.

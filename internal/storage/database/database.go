@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adwski/shorty/internal/model"
+
 	"github.com/adwski/shorty/internal/storage"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -46,6 +48,18 @@ func (db *Database) Ping(ctx context.Context) error {
 		return fmt.Errorf("db ping unsuccessful: %w", err)
 	}
 	return nil
+}
+
+// Stats returns total number of unique urls and users.
+func (db *Database) Stats(ctx context.Context) (*model.StatsResponse, error) {
+	query := `select ` +
+		`(select count(*) from urls where deleted = false) as urls_count, ` +
+		`(select count (*) from (select distinct userid from urls where deleted = false) as tmp) as users_count`
+	var stats model.StatsResponse
+	if err := db.pool.QueryRow(ctx, query).Scan(&stats.URLs, &stats.Users); err != nil {
+		return nil, fmt.Errorf("stats query error: %w", err)
+	}
+	return &stats, nil
 }
 
 // Store stores url in database. Overwrite flag controls if already stored url can be overwritten if hash is the same.

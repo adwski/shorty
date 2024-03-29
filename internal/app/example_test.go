@@ -24,7 +24,7 @@ func Example() { //nolint:testableexamples // no output here
 	})
 
 	// Create shortener app
-	shorty := NewShorty(logger, dbStore, &config.Config{
+	shorty, _ := NewShorty(logger, dbStore, &config.Config{
 		ListenAddr:     ":8080",
 		ServedHost:     "localhost",
 		ServedScheme:   "http",

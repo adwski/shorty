@@ -74,10 +74,14 @@ func run(logger *zap.Logger, cfg *config.Config) error {
 	}
 
 	var (
-		wg     = &sync.WaitGroup{}
-		errc   = make(chan error)
-		shorty = app.NewShorty(logger, store, cfg)
+		wg   = &sync.WaitGroup{}
+		errc = make(chan error)
 	)
+
+	shorty, err := app.NewShorty(logger, store, cfg)
+	if err != nil {
+		return fmt.Errorf("cannot create app: %w", err)
+	}
 
 	if cfg.PprofServerAddr != "" {
 		prof := profiler.New(&profiler.Config{

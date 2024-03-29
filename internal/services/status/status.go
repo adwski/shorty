@@ -3,25 +3,29 @@ package status
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+
+	"github.com/adwski/shorty/internal/model"
 
 	"go.uber.org/zap"
 )
 
-// Pingable is a pingable storage type used by status service.
-type Pingable interface {
+// Storage is a storage type used by status service.
+type Storage interface {
 	Ping(context.Context) error
+	Stats(context.Context) (*model.StatsResponse, error)
 }
 
 // Service is a status service.
 type Service struct {
-	store Pingable
+	store Storage
 	log   *zap.Logger
 }
 
 // Config is status service config.
 type Config struct {
-	Storage Pingable
+	Storage Storage
 	Logger  *zap.Logger
 }
 
@@ -41,5 +45,26 @@ func (svc *Service) Ping(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (svc *Service) Stats(w http.ResponseWriter, req *http.Request) {
+	stats, err := svc.store.Stats(req.Context())
+	if err != nil {
+		svc.log.Error("cannot get storage stats", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	b, err := json.Marshal(stats)
+	if err != nil {
+		svc.log.Error("cannot marshal stats response", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err = w.Write(b); err != nil {
+		svc.log.Error("cannot write stats body")
 	}
 }

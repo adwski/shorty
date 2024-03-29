@@ -22,6 +22,7 @@ func newFromFlags() (*Config, error) {
 	cfg := &Config{
 		TLS:     &TLS{},
 		Storage: &Storage{},
+		Filter:  &Filter{},
 	}
 
 	fs.StringVarP(&cfg.configFilePath, "config", "c", "", "path to config file")
@@ -45,6 +46,11 @@ func newFromFlags() (*Config, error) {
 	fs.BoolVar(&cfg.TLS.UseSelfSigned, "self_signed", false, "generate self signed cert on startup")
 	fs.StringVar(&cfg.TLS.KeyPath, "tls_key", "", "path to private key")
 	fs.StringVar(&cfg.TLS.CertPath, "tls_cert", "", "path to certificate")
+
+	fs.StringVarP(&cfg.Filter.Subnets, "trusted_subnets", "t", "", "comma separated list of trusted subnets, v4 and v6")
+	fs.BoolVar(&cfg.Filter.TrustXFF, "trust_x_forwarded_for", false,
+		"trust x-forwarded-for header during request filtering")
+	fs.BoolVar(&cfg.Filter.TrustXRealIP, "trust_x_real_ip", false, "trust x-real-ip header during request filtering")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return nil, fmt.Errorf("cannot parse command line arguments: %w", err)
