@@ -1,48 +1,31 @@
 package shortener
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/session"
-	"github.com/adwski/shorty/internal/user"
-
-	"github.com/adwski/shorty/internal/storage"
-
 	"github.com/adwski/shorty/internal/app/mockapp"
-
-	"github.com/stretchr/testify/mock"
-
-	"go.uber.org/zap"
-
+	"github.com/adwski/shorty/internal/model"
+	"github.com/adwski/shorty/internal/user"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestService_Shorten(t *testing.T) {
 	type args struct {
-		pathLength     uint
-		url            string
-		headers        map[string]string
-		addToStorage   map[string]string
-		host           string
-		servedScheme   string
-		redirectScheme string
-		json           bool
-		invalid        bool
+		pathLength        uint
+		url               string
+		addToStorage      map[string]string
+		host              string
+		servedScheme      string
+		redirectScheme    string
+		doNotRegisterMock bool
 	}
 	type want struct {
-		status    int
-		headers   map[string]string
-		emptyBody bool
-		url       string
+		err error
 	}
 	tests := []struct {
 		name string
@@ -57,12 +40,6 @@ func TestService_Shorten(t *testing.T) {
 				servedScheme: "http",
 				host:         "ccc.ddd",
 			},
-			want: want{
-				status: http.StatusCreated,
-				headers: map[string]string{
-					"Content-Type": "text/plain",
-				},
-			},
 		},
 		{
 			name: "store redirect json",
@@ -71,17 +48,6 @@ func TestService_Shorten(t *testing.T) {
 				url:          "https://aaa.bbb",
 				servedScheme: "http",
 				host:         "ccc.ddd",
-				headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				json: true,
-			},
-			want: want{
-				status: http.StatusCreated,
-				headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				url: "https://aaa.bbb",
 			},
 		},
 		{
@@ -95,25 +61,18 @@ func TestService_Shorten(t *testing.T) {
 					"qweqweqwe1": "https://aaa.bbb",
 				},
 			},
-			want: want{
-				status: http.StatusCreated,
-				headers: map[string]string{
-					"Content-Type": "text/plain",
-				},
-			},
 		},
 		{
 			name: "store url wrong scheme",
 			args: args{
-				pathLength:     20,
-				url:            "http://ccc.ddd",
-				redirectScheme: "https",
-				host:           "eee.fff",
-				invalid:        true,
+				pathLength:        20,
+				url:               "http://ccc.ddd",
+				redirectScheme:    "https",
+				host:              "eee.fff",
+				doNotRegisterMock: true,
 			},
 			want: want{
-				status:    http.StatusBadRequest,
-				emptyBody: true,
+				err: ErrUnsupportedURLScheme,
 			},
 		},
 		{
@@ -124,26 +83,21 @@ func TestService_Shorten(t *testing.T) {
 				servedScheme: "http",
 				host:         "ccc.ddd",
 			},
-			want: want{
-				status: http.StatusCreated,
-				headers: map[string]string{
-					"Content-Type": "text/plain",
-				},
-			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, err := zap.NewDevelopment()
 			require.NoError(t, err)
+
 			// Prepare storage
 			st := mockapp.NewStorage(t)
 			ctx := context.Background()
 
-			if !tt.args.invalid {
-				t.Log("registering mock expect")
+			// Register mock
+			if !tt.args.doNotRegisterMock {
 				st.On("Store", mock.Anything, mock.Anything, false).Return(
-					func(_ context.Context, url *storage.URL, _ bool) (string, error) {
+					func(_ context.Context, url *model.URL, _ bool) (string, error) {
 						t.Log("registering mock get", url)
 						st.EXPECT().Get(ctx, url.Short).Return(url.Orig, nil)
 						return "", nil
@@ -160,77 +114,29 @@ func TestService_Shorten(t *testing.T) {
 				log:            logger,
 			}
 
-			// Prepare request
-			var body []byte
-			if tt.args.json {
-				var jErr error
-				body, jErr = json.Marshal(&ShortenRequest{URL: tt.args.url})
-				require.NoError(t, jErr)
-			} else {
-				body = []byte(tt.args.url)
-			}
+			// Make Shorten call
+			usr, err := user.New()
+			require.NoError(t, err)
+			shortURL, err := svc.Shorten(ctx, usr, tt.args.url)
 
-			r := httptest.NewRequest(http.MethodGet, "/", bytes.NewReader(body))
-			r = r.WithContext(session.SetRequestID(r.Context(), "testreqest"))
-			r = r.WithContext(session.SetUserContext(r.Context(), &user.User{ID: "testuser"}))
-			for k, v := range tt.args.headers {
-				r.Header.Set(k, v)
-			}
-			r.Header.Set("Content-Length", strconv.Itoa(len(body)))
-			w := httptest.NewRecorder()
-
-			// Execute
-			if tt.args.json {
-				svc.ShortenJSON(w, r)
-			} else {
-				svc.ShortenPlain(w, r)
-			}
-			res := w.Result()
-
-			// Check status code
-			assert.Equal(t, tt.want.status, res.StatusCode)
-
-			// Check headers
-			if tt.want.headers != nil {
-				for k, v := range tt.want.headers {
-					assert.Equal(t, v, res.Header.Get(k))
-				}
-			}
-
-			if tt.want.emptyBody {
+			// Check results
+			if tt.want.err != nil {
+				require.Empty(t, shortURL)
+				require.ErrorIs(t, err, tt.want.err)
 				return
 			}
-
-			// Check body
-			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
-			require.NoError(t, res.Body.Close())
-			require.NotEqual(t, []byte{}, resBody)
 
-			// Check return URL
-			var u *url.URL
-			if tt.args.json {
-				var resp ShortenResponse
-				err = json.Unmarshal(resBody, &resp)
-				require.NoError(t, err)
-				u, err = url.Parse(resp.Result)
-				require.NoError(t, err)
-			} else {
-				u, err = url.Parse(string(resBody))
-				require.NoError(t, err)
-			}
+			u, err := url.Parse(shortURL)
+			require.NoError(t, err)
 			require.Equal(t, tt.args.pathLength, uint(len(u.Path)-1))
 			require.Equal(t, u.Scheme, tt.args.servedScheme)
 			require.Equal(t, u.Host, tt.args.host)
 
 			// Check storage content
-			storedURL, err3 := st.Get(ctx, u.Path[1:])
-			require.NoError(t, err3)
-			if tt.args.json {
-				assert.Equal(t, tt.want.url, storedURL)
-			} else {
-				assert.Equal(t, tt.args.url, storedURL)
-			}
+			storedURL, err := st.Get(ctx, u.Path[1:])
+			require.NoError(t, err)
+			assert.Equal(t, tt.args.url, storedURL)
 		})
 	}
 }

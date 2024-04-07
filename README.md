@@ -1,6 +1,6 @@
 ## URL Shortener
 
-This is learning project for Yandex Practicum's Go Course.
+This is learning project for Yandex Practicum's  Go Course.
 
 Shorty can 
  - store original url and provide shortened url back

@@ -1,20 +1,23 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"runtime/debug"
-	"sync"
 	"syscall"
 
 	"github.com/adwski/shorty/internal/app"
-	"github.com/adwski/shorty/internal/app/config"
-	"github.com/adwski/shorty/internal/profiler"
+	"github.com/adwski/shorty/internal/config"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+const (
+	envLogLevel = "LOG_LEVEL"
+
+	defaultLogLevel = zapcore.DebugLevel
 )
 
 var (
@@ -24,8 +27,37 @@ var (
 	buildCommit = "N/A"
 )
 
+func getLogger() (*zap.Logger, error) {
+	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+		MessageKey:     "msg",
+		LevelKey:       "level",
+		TimeKey:        "time",
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+	})
+	var (
+		err                 error
+		logLvl              = defaultLogLevel
+		logLevel, envExists = os.LookupEnv(envLogLevel)
+	)
+	if envExists {
+		if logLevel == "" {
+			err = errors.New(envLogLevel + " env is defined but empty")
+		} else {
+			if logLvl, err = zapcore.ParseLevel(logLevel); err != nil {
+				err = fmt.Errorf("cannot parse log level: %w", err)
+			} else {
+				logLvl = defaultLogLevel
+			}
+		}
+	}
+	logger := zap.New(zapcore.NewCore(encoder, os.Stdout, logLvl))
+	return logger, err
+}
+
 func main() {
-	logger, errLvl := initLogger()
+	logger, errLvl := getLogger()
 	defer func() {
 		if errLog := logger.Sync(); errLog != nil &&
 			!errors.Is(errLog, syscall.EBADF) &&
@@ -55,53 +87,5 @@ func main() {
 		logger.Fatal("cannot configure app", zap.Error(err))
 	}
 
-	if err = run(logger, cfg); err != nil {
-		logger.Fatal("runtime error", zap.Error(err))
-	}
-}
-
-func run(logger *zap.Logger, cfg *config.Config) error {
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-	)
-	defer cancel()
-
-	store, err := initStorage(ctx, logger, cfg.Storage)
-	if err != nil {
-		return fmt.Errorf("cannot configure storage: %w", err)
-	}
-
-	var (
-		wg   = &sync.WaitGroup{}
-		errc = make(chan error)
-	)
-
-	shorty, err := app.NewShorty(logger, store, cfg)
-	if err != nil {
-		return fmt.Errorf("cannot create app: %w", err)
-	}
-
-	if cfg.PprofServerAddr != "" {
-		prof := profiler.New(&profiler.Config{
-			Logger:        logger,
-			ListenAddress: cfg.PprofServerAddr,
-		})
-		wg.Add(1)
-		go prof.Run(ctx, wg, errc)
-	}
-
-	wg.Add(1)
-	go shorty.Run(ctx, wg, errc)
-
-	select {
-	case <-ctx.Done():
-		logger.Warn("shutting down")
-	case <-errc:
-		cancel()
-	}
-	wg.Wait()
-	store.Close()
-	return nil
+	defer os.Exit(app.Run(logger, cfg))
 }

@@ -26,8 +26,13 @@ type Middleware struct {
 
 // New creates auth middleware.
 func New(logger *zap.Logger, jwtSecret string) *Middleware {
+	return NewFromAuthorizer(logger, authorizer.New(jwtSecret))
+}
+
+// NewFromAuthorizer creates auth middleware using existing authorizer instance.
+func NewFromAuthorizer(logger *zap.Logger, a *authorizer.Auth) *Middleware {
 	return &Middleware{
-		Auth: authorizer.New(jwtSecret),
+		Auth: a,
 		log:  logger.With(zap.String("component", "auth")),
 	}
 }

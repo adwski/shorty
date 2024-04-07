@@ -15,11 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
-
+	"github.com/adwski/shorty/internal/model"
 	"github.com/adwski/shorty/internal/storage/memory"
 	"github.com/adwski/shorty/internal/storage/memory/db"
-
 	"go.uber.org/zap"
 )
 
@@ -104,7 +102,7 @@ func (s *File) Close() {
 }
 
 // Store stores shortened URL.
-func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
+func (s *File) Store(ctx context.Context, url *model.URL, overwrite bool) (string, error) {
 	if s.shutdown.Load() {
 		return "", errors.New("storage is shutting down")
 	}
@@ -116,7 +114,7 @@ func (s *File) Store(ctx context.Context, url *storage.URL, overwrite bool) (str
 }
 
 // StoreBatch stores batch of shortened URLs.
-func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
+func (s *File) StoreBatch(ctx context.Context, urls []model.URL) error {
 	if s.shutdown.Load() {
 		return errors.New("storage is shutting down")
 	}
@@ -128,7 +126,7 @@ func (s *File) StoreBatch(ctx context.Context, urls []storage.URL) error {
 }
 
 // DeleteUserURLs deletes batch of user urls.
-func (s *File) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
+func (s *File) DeleteUserURLs(ctx context.Context, urls []model.URL) (int64, error) {
 	if s.shutdown.Load() {
 		return 0, errors.New("storage is shutting down")
 	}

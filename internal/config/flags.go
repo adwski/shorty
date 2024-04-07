@@ -10,6 +10,7 @@ import (
 var (
 	defaults = map[string]string{
 		"listen_addr":       ":8080",
+		"grpc_listen_addr":  ":9090",
 		"base_url":          "http://localhost:8080",
 		"jwt_secret":        "supersecret",
 		"file_storage_path": "/tmp/short-url-db.json",
@@ -28,6 +29,7 @@ func newFromFlags() (*Config, error) {
 	fs.StringVarP(&cfg.configFilePath, "config", "c", "", "path to config file")
 
 	fs.StringVarP(&cfg.ListenAddr, "listen_addr", "a", defaults["listen_addr"], "listen address")
+	fs.StringVarP(&cfg.GRPCListenAddr, "grpc_listen_addr", "g", defaults["grpc_listen_addr"], "grpc listen address")
 	fs.StringVarP(&cfg.PprofServerAddr, "pprof_addr", "p", "",
 		"pprof server listen address, it will not start if left empty")
 	fs.StringVarP(&cfg.BaseURL, "base_url", "b", defaults["base_url"], "base server URL")

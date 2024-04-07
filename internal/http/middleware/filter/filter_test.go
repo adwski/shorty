@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/adwski/shorty/internal/filter"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -123,11 +125,11 @@ func TestMiddleware(t *testing.T) {
 			called: false,
 		},
 		{
-			name: "trust all",
+			name: "block all",
 			args: args{
 				trusted: "",
 			},
-			called: true,
+			called: false,
 		},
 		{
 			name: "no match",
@@ -204,7 +206,7 @@ func TestMiddleware(t *testing.T) {
 			require.NoError(t, errL)
 
 			// create middleware
-			mw, err := New(&Config{
+			mw, err := New(&filter.Config{
 				Logger:             logger,
 				Subnets:            tt.args.trusted,
 				TrustXForwardedFor: tt.args.trustXFF,

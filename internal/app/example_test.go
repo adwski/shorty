@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/config"
 	"github.com/adwski/shorty/internal/storage/database"
 	"go.uber.org/zap"
 )
@@ -32,10 +32,10 @@ func Example() { //nolint:testableexamples // no output here
 		TrustRequestID: true,
 	})
 
-	// Run app
+	// Run app with http server
 	wg := &sync.WaitGroup{}
 	errc := make(chan error)
-	go shorty.Run(ctx, wg, errc)
+	go shorty.http.Run(ctx, wg, errc)
 
 	cancel()
 }

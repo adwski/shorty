@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package shorty;
+
+option go_package="internal/grpc;grpc";
+
+service shortener {
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+  rpc Shorten(ShortenRequest) returns (ShortenResponse);
+  rpc ShortenBatch(ShortenBatchRequest) returns (ShortenBatchResponse);
+  rpc DeleteBatch(DeleteBatchRequest) returns (DeleteBatchResponse);
+  rpc GetAll(GetAllRequest) returns (GetAllResponse);
+  rpc Stats(StatsRequest) returns (StatsResponse);
+}
+
+message ResolveRequest {
+  string path = 1;
+}
+
+message ResolveResponse {
+  string original_url = 1;
+}
+
+message ShortenRequest {
+  string original_url = 1;
+}
+
+message ShortenResponse {
+  string short_url = 1;
+}
+
+message ShortenBatchRequest {
+  repeated OriginalURL batch_url = 1;
+}
+
+message OriginalURL {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message ShortenBatchResponse {
+  repeated ShortURL batch_url = 1;
+}
+
+message ShortURL {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+message DeleteBatchRequest {
+  repeated string hashes = 1;
+}
+
+message DeleteBatchResponse {}
+
+message GetAllRequest {}
+
+message GetAllResponse {
+  repeated URL urls = 1;
+}
+
+message URL {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  int64 urls = 1;
+  int64 users = 2;
+}

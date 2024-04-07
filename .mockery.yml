@@ -5,7 +5,6 @@ mockname: "{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName|lower}}.go"
 outpkg: "mock{{.PackageName}}"
 dir: "{{.InterfaceDir}}/mock{{.PackageName}}"
-boilerplate-file: "mockery_boilerplate.txt"
 packages:
   github.com/adwski/shorty/internal/app:
     interfaces:

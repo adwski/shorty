@@ -1,36 +1,27 @@
 package resolver
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
-	"github.com/adwski/shorty/internal/session"
-
 	"github.com/adwski/shorty/internal/app/mockapp"
-
-	"github.com/adwski/shorty/internal/storage"
-
-	"go.uber.org/zap"
-
+	"github.com/adwski/shorty/internal/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestService_Redirect(t *testing.T) {
 	type args struct {
 		pathLength   uint
-		shortURL     string
+		path         string
 		invalid      bool
 		addToStorage map[string]string
 	}
 	type want struct {
-		status  int
-		headers map[string]string
-		body    string
+		orig string
+		err  error
 	}
 	tests := []struct {
 		name string
@@ -41,62 +32,67 @@ func TestService_Redirect(t *testing.T) {
 			name: "redirect existing",
 			args: args{
 				pathLength: 10,
-				shortURL:   "qweasdzxcr",
+				path:       "/qweasdzxcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
 			},
 			want: want{
-				status: http.StatusTemporaryRedirect,
-				headers: map[string]string{
-					"Location": "https://aaa.bbb",
-				},
+				orig: "https://aaa.bbb",
 			},
 		},
 		{
 			name: "redirect existing, different path length",
 			args: args{
 				pathLength: 20,
-				shortURL:   "qweasdzxcr",
+				path:       "/qweasdzxcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
 			},
 			want: want{
-				status: http.StatusTemporaryRedirect,
-				headers: map[string]string{
-					"Location": "https://aaa.bbb",
-				},
+				orig: "https://aaa.bbb",
 			},
 		},
 		{
 			name: "redirect not existing",
 			args: args{
 				pathLength: 10,
-				shortURL:   "qweasd1xcr",
+				path:       "/qweasd1xcr",
 				addToStorage: map[string]string{
 					"qweasdzxcr": "https://aaa.bbb",
 				},
 			},
 			want: want{
-				status: http.StatusNotFound,
-				headers: map[string]string{
-					"Location": "",
-				},
+				err: model.ErrNotFound,
 			},
 		},
 		{
 			name: "invalid request path",
 			args: args{
 				pathLength: 10,
-				shortURL:   "qweasd&*zxcrаб",
+				path:       "/qweasd&*zxcrаб",
 				invalid:    true,
 				addToStorage: map[string]string{
 					"qweasdzxcr123": "https://aaa.bbb",
 				},
 			},
 			want: want{
-				status: http.StatusBadRequest,
+				err: ErrInvalidPath,
+			},
+		},
+		{
+			name: "invalid request path 2",
+			args: args{
+				pathLength: 10,
+				path:       "qweasdzxcr123",
+				invalid:    true,
+				addToStorage: map[string]string{
+					"qweasdzxcr123": "https://aaa.bbb",
+				},
+			},
+			want: want{
+				err: ErrInvalidPath,
 			},
 		},
 	}
@@ -107,12 +103,12 @@ func TestService_Redirect(t *testing.T) {
 
 			st := mockapp.NewStorage(t)
 
-			if v, ok := tt.args.addToStorage[tt.args.shortURL]; !ok {
+			if v, ok := tt.args.addToStorage[tt.args.path[1:]]; !ok {
 				if !tt.args.invalid {
-					st.EXPECT().Get(mock.Anything, tt.args.shortURL).Return("", storage.ErrNotFound)
+					st.EXPECT().Get(mock.Anything, tt.args.path[1:]).Return("", model.ErrNotFound)
 				}
 			} else {
-				st.EXPECT().Get(mock.Anything, tt.args.shortURL).Return(v, nil)
+				st.EXPECT().Get(mock.Anything, tt.args.path[1:]).Return(v, nil)
 			}
 
 			svc := &Service{
@@ -120,25 +116,14 @@ func TestService_Redirect(t *testing.T) {
 				log:   logger,
 			}
 
-			r := httptest.NewRequest(http.MethodGet, "/"+tt.args.shortURL, nil)
-			r = r.WithContext(session.SetRequestID(r.Context(), "test-request"))
-			w := httptest.NewRecorder()
-			svc.Resolve(w, r)
-
-			res := w.Result()
-
-			assert.Equal(t, tt.want.status, res.StatusCode)
-
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
-			require.NoError(t, res.Body.Close())
-
-			if tt.want.headers != nil {
-				for k, v := range tt.want.headers {
-					assert.Equal(t, v, res.Header.Get(k))
-				}
+			orig, err := svc.Resolve(context.Background(), tt.args.path)
+			if tt.want.err != nil {
+				assert.Empty(t, orig)
+				assert.ErrorIs(t, err, tt.want.err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want.orig, orig)
 			}
-			assert.Equal(t, tt.want.body, string(resBody)) // JSONEq
 		})
 	}
 }

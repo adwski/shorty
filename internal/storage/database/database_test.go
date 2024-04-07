@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package database
 
@@ -11,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adwski/shorty/internal/storage"
+	"github.com/adwski/shorty/internal/model"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +66,7 @@ func cleanUP(ctx context.Context, log *zap.Logger, pool *pgxpool.Pool) {
 
 func TestDatabase_Get(t *testing.T) {
 	type args struct {
-		urlInDB *storage.URL
+		urlInDB *model.URL
 		get     string
 	}
 	type want struct {
@@ -82,7 +81,7 @@ func TestDatabase_Get(t *testing.T) {
 		{
 			name: "simple get",
 			args: args{
-				urlInDB: &storage.URL{
+				urlInDB: &model.URL{
 					Short: "test123",
 					Orig:  "http://test123.test123/test123",
 				},
@@ -98,7 +97,7 @@ func TestDatabase_Get(t *testing.T) {
 				get: "test123",
 			},
 			want: want{
-				err: storage.ErrNotFound,
+				err: model.ErrNotFound,
 			},
 		},
 	}
@@ -127,8 +126,8 @@ func TestDatabase_Get(t *testing.T) {
 
 func TestDatabase_Store(t *testing.T) {
 	type args struct {
-		urlInDB   *storage.URL
-		storeURL  storage.URL
+		urlInDB   *model.URL
+		storeURL  model.URL
 		overwrite bool
 	}
 	type want struct {
@@ -143,7 +142,7 @@ func TestDatabase_Store(t *testing.T) {
 		{
 			name: "simple store",
 			args: args{
-				storeURL: storage.URL{
+				storeURL: model.URL{
 					Short:  "test456",
 					Orig:   "http://test456.test456/test456",
 					UserID: "testuser",
@@ -153,12 +152,12 @@ func TestDatabase_Store(t *testing.T) {
 		{
 			name: "store same overwrite",
 			args: args{
-				urlInDB: &storage.URL{
+				urlInDB: &model.URL{
 					Short:  "test456",
 					Orig:   "http://test456.test456/test456",
 					UserID: "testuser",
 				},
-				storeURL: storage.URL{
+				storeURL: model.URL{
 					Short:  "test456",
 					Orig:   "http://test456.test456/test456",
 					UserID: "testuser",
@@ -169,37 +168,37 @@ func TestDatabase_Store(t *testing.T) {
 		{
 			name: "store same no overwrite",
 			args: args{
-				urlInDB: &storage.URL{
+				urlInDB: &model.URL{
 					Short:  "test456",
 					Orig:   "http://test456.test456/test456",
 					UserID: "testuser",
 				},
-				storeURL: storage.URL{
+				storeURL: model.URL{
 					Short:  "test456",
 					Orig:   "http://test789.test789/test789",
 					UserID: "testuser",
 				},
 			},
 			want: want{
-				err: storage.ErrAlreadyExists,
+				err: model.ErrAlreadyExists,
 			},
 		},
 		{
 			name: "store same orig",
 			args: args{
-				urlInDB: &storage.URL{
+				urlInDB: &model.URL{
 					Short:  "test789",
 					Orig:   "http://test789.test789/test789",
 					UserID: "testuser",
 				},
-				storeURL: storage.URL{
+				storeURL: model.URL{
 					Short:  "test456",
 					Orig:   "http://test789.test789/test789",
 					UserID: "testuser",
 				},
 			},
 			want: want{
-				err:  storage.ErrConflict,
+				err:  model.ErrConflict,
 				hash: "test789",
 			},
 		},
@@ -228,8 +227,8 @@ func TestDatabase_Store(t *testing.T) {
 
 func TestDatabase_StoreBatch(t *testing.T) {
 	type args struct {
-		urlInDB *storage.URL
-		batch   []storage.URL
+		urlInDB *model.URL
+		batch   []model.URL
 	}
 	type want struct {
 		err error
@@ -242,7 +241,7 @@ func TestDatabase_StoreBatch(t *testing.T) {
 		{
 			name: "simple store",
 			args: args{
-				batch: []storage.URL{
+				batch: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -259,12 +258,12 @@ func TestDatabase_StoreBatch(t *testing.T) {
 		{
 			name: "store existing",
 			args: args{
-				urlInDB: &storage.URL{
+				urlInDB: &model.URL{
 					Short:  "test456",
 					Orig:   "http://test456.test456/test456",
 					UserID: "testuser",
 				},
-				batch: []storage.URL{
+				batch: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -278,7 +277,7 @@ func TestDatabase_StoreBatch(t *testing.T) {
 				},
 			},
 			want: want{
-				err: storage.ErrAlreadyExists,
+				err: model.ErrAlreadyExists,
 			},
 		},
 	}
@@ -305,7 +304,7 @@ func TestDatabase_StoreBatch(t *testing.T) {
 
 func TestDatabase_ListUserURLs(t *testing.T) {
 	type args struct {
-		urlsInDB []storage.URL
+		urlsInDB []model.URL
 		userID   string
 	}
 	type want struct {
@@ -320,7 +319,7 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 		{
 			name: "list urls",
 			args: args{
-				urlsInDB: []storage.URL{
+				urlsInDB: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -342,7 +341,7 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 		{
 			name: "empty urls",
 			args: args{
-				urlsInDB: []storage.URL{
+				urlsInDB: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -357,7 +356,7 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 				userID: "testuser3",
 			},
 			want: want{
-				err: storage.ErrNotFound,
+				err: model.ErrNotFound,
 			},
 		},
 	}
@@ -397,13 +396,13 @@ func TestDatabase_ListUserURLs(t *testing.T) {
 
 func TestDatabase_DeleteUserURLs(t *testing.T) {
 	type args struct {
-		urlsInDB        []storage.URL
-		urlsForDeletion []storage.URL
+		urlsInDB        []model.URL
+		urlsForDeletion []model.URL
 	}
 	type want struct {
 		err        error
 		affected   int64
-		urlsRemain []storage.URL
+		urlsRemain []model.URL
 	}
 	tests := []struct {
 		name string
@@ -413,7 +412,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 		{
 			name: "delete url",
 			args: args{
-				urlsInDB: []storage.URL{
+				urlsInDB: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -425,7 +424,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 						UserID: "testuser2",
 					},
 				},
-				urlsForDeletion: []storage.URL{
+				urlsForDeletion: []model.URL{
 					{
 						Short:  "test456",
 						UserID: "testuser",
@@ -434,7 +433,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 			},
 			want: want{
 				affected: 1,
-				urlsRemain: []storage.URL{
+				urlsRemain: []model.URL{
 					{
 						Short:  "test789",
 						Orig:   "http://test789.test789/test789",
@@ -446,7 +445,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 		{
 			name: "delete not existing urls",
 			args: args{
-				urlsInDB: []storage.URL{
+				urlsInDB: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",
@@ -458,7 +457,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 						UserID: "testuser2",
 					},
 				},
-				urlsForDeletion: []storage.URL{
+				urlsForDeletion: []model.URL{
 					{
 						Short:  "test4567",
 						UserID: "testuser3",
@@ -467,7 +466,7 @@ func TestDatabase_DeleteUserURLs(t *testing.T) {
 			},
 			want: want{
 				affected: 0,
-				urlsRemain: []storage.URL{
+				urlsRemain: []model.URL{
 					{
 						Short:  "test456",
 						Orig:   "http://test456.test456/test456",

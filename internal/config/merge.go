@@ -8,6 +8,7 @@ func merge(dst, src *Config) {
 
 func mergeCommon(dst, src *Config) {
 	mergeStringDef(&dst.ListenAddr, &src.ListenAddr, defaults["listen_addr"])
+	mergeStringDef(&dst.GRPCListenAddr, &src.GRPCListenAddr, defaults["grpc_listen_addr"])
 	mergeStringDef(&dst.BaseURL, &src.BaseURL, defaults["base_url"])
 	mergeString(&dst.RedirectScheme, &src.RedirectScheme)
 	mergeStringDef(&dst.JWTSecret, &src.JWTSecret, defaults["jwt_secret"])

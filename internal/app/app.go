@@ -4,46 +4,39 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log"
-	"net/http"
+	"os"
+	"os/signal"
 	"sync"
-	"time"
+	"syscall"
 
-	"github.com/adwski/shorty/internal/app/config"
-	"github.com/adwski/shorty/internal/middleware/auth"
-	"github.com/adwski/shorty/internal/middleware/compress"
-	"github.com/adwski/shorty/internal/middleware/filter"
-	"github.com/adwski/shorty/internal/middleware/logging"
-	"github.com/adwski/shorty/internal/middleware/requestid"
+	"github.com/adwski/shorty/internal/config"
+	grpcserver "github.com/adwski/shorty/internal/grpc/server"
+	httpserver "github.com/adwski/shorty/internal/http/server"
 	"github.com/adwski/shorty/internal/model"
+	"github.com/adwski/shorty/internal/profiler"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/services/status"
-	"github.com/adwski/shorty/internal/storage"
-	"github.com/go-chi/chi/v5"
+	"github.com/adwski/shorty/internal/storage/database"
+	"github.com/adwski/shorty/internal/storage/file"
+	"github.com/adwski/shorty/internal/storage/memory"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultReadHeaderTimeout = time.Second
-	defaultReadTimeout       = 5 * time.Second
-	defaultWriteTimeout      = 5 * time.Second
-	defaultIdleTimeout       = 10 * time.Second
-
 	defaultPathLength = 8
 )
 
 // Storage defines storage backend methods that is used by Shorty.
 type Storage interface {
 	Get(ctx context.Context, key string) (url string, err error)
-	Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error)
-	StoreBatch(ctx context.Context, urls []storage.URL) error
-	ListUserURLs(ctx context.Context, userid string) ([]*storage.URL, error)
-	DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error)
+	Store(ctx context.Context, url *model.URL, overwrite bool) (string, error)
+	StoreBatch(ctx context.Context, urls []model.URL) error
+	ListUserURLs(ctx context.Context, userid string) ([]*model.URL, error)
+	DeleteUserURLs(ctx context.Context, urls []model.URL) (int64, error)
 	Ping(ctx context.Context) error
-	Stats(ctx context.Context) (*model.StatsResponse, error)
+	Stats(ctx context.Context) (*model.Stats, error)
 	Close()
 }
 
@@ -51,15 +44,17 @@ type Storage interface {
 // It consists of shortener and redirector services
 // Also it uses key-value storage to store URLs and shortened paths.
 type Shorty struct {
-	log       *zap.Logger
-	server    *http.Server
-	shortener *shortener.Service
-	host      string
-	tls       bool
+	logger       *zap.Logger
+	http         *httpserver.Server
+	grpc         *grpcserver.Server
+	shortenerSvc *shortener.Service
 }
 
 // NewShorty creates Shorty instance from config.
 func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) (*Shorty, error) {
+	if storage == nil {
+		return nil, fmt.Errorf("nil storage")
+	}
 	shortenerSvc := shortener.New(&shortener.Config{
 		Store:          storage,
 		ServedScheme:   cfg.ServedScheme,
@@ -77,111 +72,117 @@ func NewShorty(logger *zap.Logger, storage Storage, cfg *config.Config) (*Shorty
 		Logger:  logger,
 	})
 
-	r := getRouterWithMiddleware(logger, cfg.TrustRequestID)
-	r.With(auth.New(logger, cfg.JWTSecret).HandlerFunc).Route("/", func(r chi.Router) {
-		r.Get("/api/user/urls", shortenerSvc.GetURLs)
-		r.Delete("/api/user/urls", shortenerSvc.DeleteURLs)
-		r.Post("/api/shorten", shortenerSvc.ShortenJSON)
-		r.Post("/api/shorten/batch", shortenerSvc.ShortenBatch)
-		r.Post("/", shortenerSvc.ShortenPlain)
-	})
-	r.Get("/{path}", resolverSvc.Resolve)
-	r.Get("/ping", statusSvc.Ping)
-
-	filterMW, err := filter.New(&filter.Config{
-		Logger:             logger,
-		Subnets:            cfg.Filter.Subnets,
-		TrustXForwardedFor: cfg.Filter.TrustXFF,
-		TrustXRealIP:       cfg.Filter.TrustXRealIP,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot create filter middleware: %w", err)
+	sh := &Shorty{
+		logger:       logger,
+		shortenerSvc: shortenerSvc,
 	}
-	r.With(filterMW.HandlerFunc).Get("/api/internal/stats", statusSvc.Stats)
-
-	return &Shorty{
-		log:       logger.With(zap.String("component", "api")),
-		host:      cfg.ServedHost,
-		shortener: shortenerSvc,
-		tls:       cfg.GetTLSConfig() != nil,
-		server: &http.Server{
-			TLSConfig:         cfg.GetTLSConfig(),
-			Addr:              cfg.ListenAddr,
-			ReadTimeout:       defaultReadTimeout,
-			ReadHeaderTimeout: defaultReadHeaderTimeout,
-			WriteTimeout:      defaultWriteTimeout,
-			IdleTimeout:       defaultIdleTimeout,
-			ErrorLog:          log.New(newSrvLogger(logger), "", 0),
-			Handler:           r,
-		},
-	}, nil
+	if cfg.ListenAddr != "" {
+		sh.http = httpserver.NewServer(logger, cfg, resolverSvc, shortenerSvc, statusSvc)
+	}
+	if cfg.GRPCListenAddr != "" {
+		sh.grpc = grpcserver.NewServer(logger, cfg, resolverSvc, shortenerSvc, statusSvc)
+	}
+	return sh, nil
 }
 
-// Run starts internal web server and returned only wen ListenAndServe returns.
-// It is intended to be started asynchronously and canceled via context.
-// Error channel should be used to catch listen errors.
-// If error is caught that means web server is no longer running.
-func (sh *Shorty) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error) {
+// Run creates and starts shorty app using provided logger and config.
+// It runs until interrupted or some error occurs.
+// Non-zero error code is returned in latter case.
+func Run(logger *zap.Logger, cfg *config.Config) int {
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+	defer cancel()
+
+	// Creating storage
+	store, err := createStorage(ctx, logger, cfg.Storage)
+	if err != nil {
+		logger.Error("storage init error", zap.Error(err))
+		return 1
+	}
+
+	var (
+		wg   = &sync.WaitGroup{}
+		errc = make(chan error)
+	)
+
+	// Creating app
+	shorty, err := NewShorty(logger, store, cfg)
+	if err != nil {
+		logger.Error("cannot create app", zap.Error(err))
+		return 1
+	}
+
+	if cfg.PprofServerAddr != "" {
+		// creating and starting pprof server
+		prof := profiler.New(&profiler.Config{
+			Logger:        logger,
+			ListenAddress: cfg.PprofServerAddr,
+		})
+		wg.Add(1)
+		go prof.Run(ctx, wg, errc)
+	}
+
+	// starting flusher
 	wg.Add(1)
-	go sh.shortener.Run(ctx, wg)
+	go shorty.shortenerSvc.GetFlusher().Run(ctx, wg)
 
-	sh.log.Info("starting server",
-		zap.String("address", sh.server.Addr),
-		zap.String("host", sh.host))
-	errSrv := make(chan error)
-	go func(errc chan error) {
-		if sh.tls {
-			// cert and key are provided via tls.Config
-			errc <- sh.server.ListenAndServeTLS("", "")
-		} else {
-			errc <- sh.server.ListenAndServe()
-		}
-	}(errSrv)
+	// starting http server
+	if shorty.http != nil {
+		wg.Add(1)
+		go shorty.http.Run(ctx, wg, errc)
+	}
 
+	// starting grpc server
+	if shorty.grpc != nil {
+		wg.Add(1)
+		go shorty.grpc.Run(ctx, wg, errc)
+	}
+
+	// waiting for signals
+	code := 0
 	select {
 	case <-ctx.Done():
-		if err := sh.server.Shutdown(context.Background()); err != nil {
-			sh.log.Error("error during server shutdown", zap.Error(err))
-		}
-
-	case err := <-errSrv:
-		if !errors.Is(err, http.ErrServerClosed) {
-			sh.log.Error("server error", zap.Error(err))
-			errc <- err
-		}
+		logger.Warn("shutting down")
+	case <-errc:
+		logger.Error("caught server error, finishing", zap.Error(err))
+		code = 1
+		cancel()
 	}
-
-	sh.log.Warn("server stopped")
-	wg.Done()
+	wg.Wait()
+	store.Close()
+	return code
 }
 
-func getRouterWithMiddleware(logger *zap.Logger, trustRequestID bool) chi.Router {
-	router := chi.NewRouter()
-	router.Use(
-		requestid.New(&requestid.Config{
-			Trust:  trustRequestID,
-			Logger: logger,
-		}).HandlerFunc,
-		logging.New(&logging.Config{
-			Logger: logger,
-		}).HandlerFunc,
-		compress.New().HandlerFunc,
-	)
-	return router
-}
+func createStorage(ctx context.Context, logger *zap.Logger, cfg *config.Storage) (store Storage, err error) {
+	switch {
+	case cfg.DatabaseDSN != "":
+		if store, err = database.New(ctx, &database.Config{
+			Logger:  logger,
+			DSN:     cfg.DatabaseDSN,
+			Migrate: true,
+			Trace:   cfg.TraceDB,
+		}); err != nil {
+			err = fmt.Errorf("cannot initialize database storage: %w", err)
+			break
+		}
+		logger.Debug("using DB storage")
 
-type srvLogger struct {
-	logger *zap.Logger
-}
+	case cfg.FileStoragePath != "":
+		if store, err = file.New(ctx, &file.Config{
+			FilePath: cfg.FileStoragePath,
+			Logger:   logger,
+		}); err != nil {
+			err = fmt.Errorf("cannot initialize file storage: %w", err)
+			break
+		}
+		logger.Debug("using file storage")
 
-func newSrvLogger(logger *zap.Logger) *srvLogger {
-	return &srvLogger{
-		logger: logger.With(zap.String("component", "server")),
+	default:
+		store = memory.New()
+		logger.Debug("using memory storage")
 	}
-}
-
-// Write writes byte slice as one Error log message.
-func (sl *srvLogger) Write(b []byte) (int, error) {
-	sl.logger.Error(string(b))
-	return len(b), nil
+	return
 }

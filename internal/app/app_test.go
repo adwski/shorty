@@ -11,17 +11,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
-
 	"github.com/adwski/shorty/internal/app/mockapp"
-
-	"github.com/stretchr/testify/mock"
-
-	"go.uber.org/zap"
-
-	"github.com/adwski/shorty/internal/app/config"
+	"github.com/adwski/shorty/internal/config"
+	"github.com/adwski/shorty/internal/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestShorty(t *testing.T) {
@@ -66,17 +62,22 @@ func TestShorty(t *testing.T) {
 
 			st := mockapp.NewStorage(t)
 			st.On("Store", mock.Anything, mock.Anything, false).Return(
-				func(_ context.Context, url *storage.URL, _ bool) (string, error) {
+				func(_ context.Context, url *model.URL, _ bool) (string, error) {
 					t.Log("registering mock get", url)
 					st.EXPECT().Get(mock.Anything, url.Short).Return(url.Orig, nil)
 					return "", nil
 				})
 
-			cfg := &config.Config{
-				ServedHost:   "xxx.yyy",
-				ServedScheme: "http",
-				Filter:       &config.Filter{},
-			}
+			cfg, err := config.New(logger)
+			require.NoError(t, err)
+			/*
+				cfg := &config.Config{
+					ListenAddr:   ":1111",
+					ServedHost:   "xxx.yyy",
+					ServedScheme: "http",
+					Filter:       &config.Filter{},
+				}
+			*/
 			shorty, err := NewShorty(logger, st, cfg)
 			require.NoError(t, err)
 
@@ -104,7 +105,7 @@ func TestShorty(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Execute
-			shorty.server.Handler.ServeHTTP(w, r)
+			shorty.http.Handler().ServeHTTP(w, r)
 			res := w.Result()
 
 			// Check status
@@ -131,7 +132,7 @@ func TestShorty(t *testing.T) {
 			w = httptest.NewRecorder()
 
 			// Execute
-			shorty.server.Handler.ServeHTTP(w, r)
+			shorty.http.Handler().ServeHTTP(w, r)
 			res = w.Result()
 			_ = res.Body.Close()
 

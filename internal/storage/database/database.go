@@ -1,4 +1,4 @@
-// Package database is postgreSQL shortened URLs storage.
+// Package database is postgreSQL shortened URLs model.
 //
 // It supports Get/Store operations and batch operations as well.
 // Tracing can be enabled to view low level postgres wire protocol messages
@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/adwski/shorty/internal/model"
-
-	"github.com/adwski/shorty/internal/storage"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -51,11 +49,11 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 // Stats returns total number of unique urls and users.
-func (db *Database) Stats(ctx context.Context) (*model.StatsResponse, error) {
+func (db *Database) Stats(ctx context.Context) (*model.Stats, error) {
 	query := `select ` +
 		`(select count(*) from urls where deleted = false) as urls_count, ` +
 		`(select count (*) from (select distinct userid from urls where deleted = false) as tmp) as users_count`
-	var stats model.StatsResponse
+	var stats model.Stats
 	if err := db.pool.QueryRow(ctx, query).Scan(&stats.URLs, &stats.Users); err != nil {
 		return nil, fmt.Errorf("stats query error: %w", err)
 	}
@@ -63,7 +61,7 @@ func (db *Database) Stats(ctx context.Context) (*model.StatsResponse, error) {
 }
 
 // Store stores url in database. Overwrite flag controls if already stored url can be overwritten if hash is the same.
-func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool) (string, error) {
+func (db *Database) Store(ctx context.Context, url *model.URL, overwrite bool) (string, error) {
 	if overwrite {
 		// we could not do it in one query here
 		// because of conflict with unique orig constraint
@@ -86,21 +84,21 @@ func (db *Database) Store(ctx context.Context, url *storage.URL, overwrite bool)
 	}
 	if pgErr.Code == pgerrcode.UniqueViolation {
 		if pgErr.ConstraintName == urlsIndexHash {
-			return "", storage.ErrAlreadyExists
+			return "", model.ErrAlreadyExists
 		}
 		if pgErr.ConstraintName == urlsIndexOrig {
 			storedHash, errGet := db.getHashByURL(ctx, url.Orig)
 			if errGet != nil {
 				return "", errGet
 			}
-			return storedHash, storage.ErrConflict
+			return storedHash, model.ErrConflict
 		}
 	}
 	return "", fmt.Errorf("postgres error: %w", err)
 }
 
 // StoreBatch stores list of urls using pgx batch insert.
-func (db *Database) StoreBatch(ctx context.Context, urls []storage.URL) error {
+func (db *Database) StoreBatch(ctx context.Context, urls []model.URL) error {
 	batch := &pgx.Batch{} // implicit BEGIN and COMMIT
 	for _, url := range urls {
 		// There's an upper limit for number of queries that can be bundled in single batch,
@@ -115,7 +113,7 @@ func (db *Database) StoreBatch(ctx context.Context, urls []storage.URL) error {
 			return fmt.Errorf("unknown postgres error: %w", err)
 		}
 		if pgErr.Code == pgerrcode.UniqueViolation {
-			return storage.ErrAlreadyExists
+			return model.ErrAlreadyExists
 		}
 		return fmt.Errorf("pgx batch error: %w", err)
 	}
@@ -130,28 +128,28 @@ func (db *Database) Get(ctx context.Context, hash string) (string, error) {
 	)
 	err := db.pool.QueryRow(ctx, `select orig, deleted from urls where hash = $1`, hash).Scan(&url, &deleted)
 	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		return "", storage.ErrNotFound
+		return "", model.ErrNotFound
 	}
 	if deleted {
-		return "", storage.ErrDeleted
+		return "", model.ErrDeleted
 	}
 	return url, nil
 }
 
 // ListUserURLs retrieves all urls that have specified user ID.
-func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage.URL, error) {
+func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*model.URL, error) {
 	query := `select hash, orig from urls where userid = $1 and deleted = false`
 	rows, err := db.pool.Query(ctx, query, userID)
 	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		err = storage.ErrNotFound
+		err = model.ErrNotFound
 		return nil, err
 	}
 	db.log.Debug("listing urls for user",
 		zap.String("userID", userID))
 	// Use generic CollectRows()
 	// https://youtu.be/sXMSWhcHCf8?t=995
-	urls, errR := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*storage.URL, error) {
-		var url storage.URL
+	urls, errR := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*model.URL, error) {
+		var url model.URL
 		if errS := row.Scan(&url.Short, &url.Orig); errS != nil {
 			return nil, fmt.Errorf("error while scanning row: %w", errS)
 		}
@@ -161,14 +159,14 @@ func (db *Database) ListUserURLs(ctx context.Context, userID string) ([]*storage
 		return nil, fmt.Errorf("error while collecting rows: %w", errR)
 	}
 	if len(urls) == 0 {
-		return nil, storage.ErrNotFound
+		return nil, model.ErrNotFound
 	}
 	return urls, nil
 }
 
 // DeleteUserURLs deletes list of urls using batch query. It performs soft delete, i.e. not actually deleting
 // records from db but just marks them as "deleted".
-func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int64, error) {
+func (db *Database) DeleteUserURLs(ctx context.Context, urls []model.URL) (int64, error) {
 	var (
 		batch    = &pgx.Batch{}
 		ts       = time.Now().UnixMicro()
@@ -204,14 +202,14 @@ func (db *Database) DeleteUserURLs(ctx context.Context, urls []storage.URL) (int
 func (db *Database) getHashByURL(ctx context.Context, url string) (hash string, err error) {
 	err = db.pool.QueryRow(ctx, `select hash from urls where orig = $1 and deleted = false`, url).Scan(&hash)
 	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		err = storage.ErrNotFound
+		err = model.ErrNotFound
 	}
 	return
 }
 
-func (db *Database) storeWithOverwrite(ctx context.Context, url *storage.URL) (string, error) {
+func (db *Database) storeWithOverwrite(ctx context.Context, url *model.URL) (string, error) {
 	if storedURL, err := db.Get(ctx, url.Short); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, model.ErrNotFound) {
 			// no records, call store with no overwrite
 			return db.Store(ctx, url, false)
 		}
@@ -225,7 +223,7 @@ func (db *Database) storeWithOverwrite(ctx context.Context, url *storage.URL) (s
 	return "", db.updateOrig(ctx, url)
 }
 
-func (db *Database) updateOrig(ctx context.Context, url *storage.URL) error {
+func (db *Database) updateOrig(ctx context.Context, url *model.URL) error {
 	query := "update urls set hash = $1 where orig = $2"
 	tag, err := db.pool.Exec(ctx, query, url.Short, url.Orig)
 	if err != nil {

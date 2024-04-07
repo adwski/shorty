@@ -1,4 +1,4 @@
-// Package memory is simple in-memory shortened URL storage.
+// Package memory is simple in-memory shortened URL model.
 package memory
 
 import (
@@ -8,11 +8,8 @@ import (
 	"sync"
 
 	"github.com/adwski/shorty/internal/model"
-
 	"github.com/adwski/shorty/internal/storage/memory/db"
 	"github.com/gofrs/uuid/v5"
-
-	"github.com/adwski/shorty/internal/storage"
 )
 
 // Memory is an in-memory URL storage
@@ -24,7 +21,7 @@ type Memory struct {
 	gen uuid.Generator
 }
 
-// New create new memory storage.
+// New create new memory model.
 func New() *Memory {
 	return &Memory{
 		DB:  db.NewDB(),
@@ -36,26 +33,26 @@ func New() *Memory {
 // Close does nothing. It's here just to comply to shortener interface.
 func (m *Memory) Close() {}
 
-// Get retrieves URL from storage.
+// Get retrieves URL from model.
 func (m *Memory) Get(_ context.Context, key string) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	record, ok := m.DB[key]
 	if !ok {
-		return "", storage.ErrNotFound
+		return "", model.ErrNotFound
 	}
 	if record.Deleted {
-		return "", storage.ErrDeleted
+		return "", model.ErrDeleted
 	}
 	return record.OriginalURL, nil
 }
 
-// Store stores shortened URL in storage.
-func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (string, error) {
+// Store stores shortened URL in model.
+func (m *Memory) Store(_ context.Context, url *model.URL, overwrite bool) (string, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if u, ok := m.DB[url.Short]; ok && !overwrite && !u.Deleted {
-		return "", storage.ErrAlreadyExists
+		return "", model.ErrAlreadyExists
 	}
 	u, err := m.gen.NewV4()
 	if err != nil {
@@ -71,13 +68,13 @@ func (m *Memory) Store(_ context.Context, url *storage.URL, overwrite bool) (str
 }
 
 // ListUserURLs returns all URL by specified user.
-func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL, error) {
+func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*model.URL, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	var urls []*storage.URL
+	var urls []*model.URL
 	for _, record := range m.DB {
 		if record.UserID == userID {
-			urls = append(urls, &storage.URL{
+			urls = append(urls, &model.URL{
 				Short:  record.ShortURL,
 				Orig:   record.OriginalURL,
 				UserID: userID,
@@ -88,7 +85,7 @@ func (m *Memory) ListUserURLs(_ context.Context, userID string) ([]*storage.URL,
 }
 
 // DeleteUserURLs deleted batch of URLs.
-func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, error) {
+func (m *Memory) DeleteUserURLs(_ context.Context, urls []model.URL) (int64, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	var num int64
@@ -105,13 +102,13 @@ func (m *Memory) DeleteUserURLs(_ context.Context, urls []storage.URL) (int64, e
 }
 
 // StoreBatch stores URL batch.
-func (m *Memory) StoreBatch(_ context.Context, urls []storage.URL) error {
+func (m *Memory) StoreBatch(_ context.Context, urls []model.URL) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	IDs := make([]string, len(urls))
 	for i, url := range urls {
 		if u, ok := m.DB[url.Short]; ok && !u.Deleted {
-			return storage.ErrAlreadyExists
+			return model.ErrAlreadyExists
 		}
 		u, err := m.gen.NewV4()
 		if err != nil {
@@ -145,6 +142,6 @@ func (m *Memory) Ping(_ context.Context) error {
 }
 
 // Stats returns total number of unique urls and users.
-func (m *Memory) Stats(_ context.Context) (*model.StatsResponse, error) {
+func (m *Memory) Stats(_ context.Context) (*model.Stats, error) {
 	return m.DB.Stats(), nil
 }
