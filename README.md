@@ -1,6 +1,6 @@
 ## URL Shortener
 
-This is learning project for Yandex Practicum's  Go Course.
+This is learning project for Yandex Practicum's Go Course.
 
 Shorty can 
  - store original url and provide shortened url back
@@ -12,6 +12,8 @@ Storage backends are
  - in-memory
  - in-memory with fs persistence
  - database (PostgreSQL)
+
+HTTP and GRPC transports are supported.
 
 ## Development
 
