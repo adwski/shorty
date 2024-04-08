@@ -34,6 +34,7 @@ type Config struct {
 	ServedHost      string `json:"-"`
 	ServedScheme    string `json:"-"`
 
+	GRPCReflection bool `json:"grpc_reflection"`
 	TrustRequestID bool `json:"trust_request_id"`
 }
 

@@ -35,6 +35,7 @@ var testConfig = `
   "redirect_scheme": "http",
   "jwt_secret": "qweqwe",
   "trust_request_id": true,
+  "grpc_reflection": true,
   "filter": {
     "trusted_subnets": "1.1.0.0/16,fedc::/16",
     "trust_x_forwarded_for": true,

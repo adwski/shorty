@@ -3,19 +3,23 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/adwski/shorty/internal/config"
 	g "github.com/adwski/shorty/internal/grpc"
+	"github.com/adwski/shorty/internal/grpc/interceptors/auth"
+	"github.com/adwski/shorty/internal/grpc/interceptors/filter"
+	"github.com/adwski/shorty/internal/grpc/interceptors/logging"
+	"github.com/adwski/shorty/internal/grpc/interceptors/requestid"
 	"github.com/adwski/shorty/internal/services/resolver"
 	"github.com/adwski/shorty/internal/services/shortener"
 	"github.com/adwski/shorty/internal/services/status"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/reflection"
 )
 
 const (
@@ -32,8 +36,10 @@ type Server struct {
 	resolverSvc  *resolver.Service
 	statusSvc    *status.Service
 
-	tls  *tls.Config
 	addr string
+	opts []grpc.ServerOption
+
+	reflection bool
 }
 
 // NewServer creates new grpc transport server.
@@ -44,13 +50,32 @@ func NewServer(
 	shortenerSvc *shortener.Service,
 	statusSvc *status.Service,
 ) *Server {
+	// assign options
+	var opts []grpc.ServerOption
+	opts = append(opts, grpc.ConnectionTimeout(defaultServerConnectionTimeout))
+	if t := cfg.GetTLSConfig(); t != nil {
+		opts = append(opts, grpc.Creds(credentials.NewTLS(t)))
+	}
+
+	// assign interceptors
+	opts = append(opts,
+		// requestID
+		grpc.ChainUnaryInterceptor(requestid.New(logger, cfg.TrustRequestID).Get()),
+		// logging
+		grpc.ChainUnaryInterceptor(logging.New(logger).Get()),
+		// filter
+		grpc.ChainUnaryInterceptor(filter.NewFromFilter(cfg.GetFilter(), []string{"/shorty.shortener/Stats"}).Get()),
+		// auth
+		grpc.ChainUnaryInterceptor(auth.NewFromAuthorizer(logger, cfg.GetAuthorizer()).Get()))
+
 	return &Server{
 		logger:       logger.With(zap.String("component", "grpc")),
 		shortenerSvc: shortenerSvc,
 		resolverSvc:  resolverSvc,
 		statusSvc:    statusSvc,
-		tls:          cfg.GetTLSConfig(),
+		opts:         opts,
 		addr:         cfg.GRPCListenAddr,
+		reflection:   cfg.GRPCReflection,
 	}
 }
 
@@ -68,16 +93,12 @@ func (srv *Server) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error)
 		return
 	}
 
-	// assign options
-	var opts []grpc.ServerOption
-	opts = append(opts, grpc.ConnectionTimeout(defaultServerConnectionTimeout))
-	if srv.tls != nil {
-		opts = append(opts, grpc.Creds(credentials.NewTLS(srv.tls)))
-	}
-
 	// create grpc server
-	s := grpc.NewServer(opts...)
+	s := grpc.NewServer(srv.opts...)
 	g.RegisterShortenerServer(s, srv)
+	if srv.reflection {
+		reflection.Register(s)
+	}
 
 	// start server
 	srv.logger.Info("starting server", zap.String("address", listener.Addr().String()))

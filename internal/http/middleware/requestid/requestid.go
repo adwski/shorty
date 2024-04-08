@@ -5,6 +5,7 @@
 package requestid
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/adwski/shorty/internal/session"
@@ -46,19 +47,22 @@ func (mw *Middleware) HandlerFunc(h http.Handler) http.Handler {
 // ServeHTTP checks requestID header and/or generates new requestID which is passed
 // to upstream handlers using request context.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var newCtx context.Context
 	if mw.trust {
 		if reqID := r.Header.Get("X-Request-ID"); reqID != "" {
-			mw.handler.ServeHTTP(w, r.WithContext(session.SetRequestID(r.Context(), reqID)))
-			return
+			newCtx = session.SetRequestID(r.Context(), reqID)
 		}
 		mw.log.Debug("incoming request without id but trust is enabled")
 	}
 
-	u, err := mw.gen.NewV4()
-	if err != nil {
-		mw.log.Error("cannot generate unique request id", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if newCtx == nil {
+		u, err := mw.gen.NewV4()
+		if err != nil {
+			mw.log.Error("cannot generate unique request id", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		newCtx = session.SetRequestID(r.Context(), u.String())
 	}
-	mw.handler.ServeHTTP(w, r.WithContext(session.SetRequestID(r.Context(), u.String())))
+	mw.handler.ServeHTTP(w, r.WithContext(newCtx))
 }

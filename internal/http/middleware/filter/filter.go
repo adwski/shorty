@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	"github.com/adwski/shorty/internal/filter"
-	"go.uber.org/zap"
 )
 
 // Middleware is a filtering middleware.
@@ -25,14 +24,6 @@ type Middleware struct {
 	*filter.Filter
 	handler http.Handler
 	block   bool
-}
-
-// Config is filtering middleware configuration.
-type Config struct {
-	Logger             *zap.Logger
-	Subnets            string
-	TrustXForwardedFor bool
-	TrustXRealIP       bool
 }
 
 // New creates filtering middleware. If subnets from config

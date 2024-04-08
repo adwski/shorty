@@ -37,6 +37,8 @@ func newFromFlags() (*Config, error) {
 	fs.StringVar(&cfg.RedirectScheme, "redirect_scheme", "", "enforce redirect scheme, leave empty to allow all")
 	fs.BoolVar(&cfg.TrustRequestID, "trust_request_id", false,
 		"trust X-Request-Id header, if disabled unique id will be generated for each request even if header exists")
+	fs.BoolVar(&cfg.GRPCReflection, "grpc_reflection", false,
+		"enables grpc reflection api, useful for testing with gui clients")
 
 	fs.StringVarP(&cfg.Storage.FileStoragePath, "file_storage_path", "f",
 		defaults["file_storage_path"], "file storage path")

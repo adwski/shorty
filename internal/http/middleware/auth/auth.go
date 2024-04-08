@@ -8,13 +8,17 @@
 package auth
 
 import (
-	"fmt"
 	"net/http"
+
+	"github.com/adwski/shorty/internal/user"
 
 	authorizer "github.com/adwski/shorty/internal/auth"
 	"github.com/adwski/shorty/internal/session"
-	"github.com/adwski/shorty/internal/user"
 	"go.uber.org/zap"
+)
+
+const (
+	sessionCookieName = "shortySessID"
 )
 
 // Middleware is authentication middleware.
@@ -49,37 +53,30 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	logf := mw.log.With(zap.String("id", requestID))
 
-	u, err := mw.GetUser(r)
+	u, token, err := mw.createOrParseUserFromRequest(r)
 	if err != nil {
-		logf.Debug("cannot get session from cookie", zap.Error(err))
-		// Missing or invalid session cookie
-		// Generate a new user
-		var sessionCookie *http.Cookie
-		if u, sessionCookie, err = mw.createUserAndCookie(); err != nil {
-			logf.Error("cannot create user session", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		logf.Error("cannot create user session", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if token != "" {
+		c := &http.Cookie{
+			Name:  sessionCookieName,
+			Value: token,
 		}
-		w.Header().Set("Set-Cookie", sessionCookie.String())
+		w.Header().Set("Set-Cookie", c.String())
 	}
 
 	// Call next handler with user context
 	mw.handler.ServeHTTP(w, r.WithContext(session.SetUserContext(r.Context(), u)))
 }
 
-func (mw *Middleware) createUserAndCookie() (*user.User, *http.Cookie, error) {
-	// Create user with unique ID
-	u, err := user.New()
+func (mw *Middleware) createOrParseUserFromRequest(r *http.Request) (*user.User, string, error) {
+	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create new user: %w", err)
+		return mw.CreateUserAndToken() //nolint:wrapcheck // err is checked in func above
 	}
-
-	// Set Cookie for new user
-	sessionCookie, errS := mw.CreateJWTCookie(u)
-	if errS != nil {
-		return nil, nil, fmt.Errorf("cannot create session cookie for user: %w", errS)
-	}
-	return u, sessionCookie, nil
+	return mw.CreateOrParseUserFromJWTString(cookie.Value) //nolint:wrapcheck // err is checked in func above
 }
 
 // HandlerFunc sets upstream middleware handler.

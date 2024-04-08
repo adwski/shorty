@@ -14,6 +14,7 @@ func mergeCommon(dst, src *Config) {
 	mergeStringDef(&dst.JWTSecret, &src.JWTSecret, defaults["jwt_secret"])
 	mergeString(&dst.PprofServerAddr, &src.PprofServerAddr)
 	mergeBool(&dst.TrustRequestID, &src.TrustRequestID)
+	mergeBool(&dst.GRPCReflection, &src.GRPCReflection)
 }
 
 func mergeStorage(dst, src *Config) {

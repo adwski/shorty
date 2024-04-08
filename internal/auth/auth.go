@@ -4,7 +4,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/adwski/shorty/internal/user"
@@ -12,8 +11,6 @@ import (
 )
 
 const (
-	sessionCookieName = "shortySessID"
-
 	defaultJWTCookieExpiration = 24 * time.Hour
 )
 
@@ -33,26 +30,43 @@ func New(jwtSecret string) *Auth {
 	return &Auth{jwtSecret: jwtSecret}
 }
 
-// GetUser retrieves user object from cookie value of incoming http request.
-func (a *Auth) GetUser(r *http.Request) (*user.User, error) {
-	sessionCookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get user from cookies: %w", err)
+// CreateOrParseUserFromJWTString parses user from jwt string.
+// If user is parsed successfully and jwt is not expired, parsed user is returned
+// and returned cookie will be nil. If user could not be parsed, new user will be created
+// and corresponding cookie value will be generated. In this case both new user and cookie are returned.
+func (a *Auth) CreateOrParseUserFromJWTString(usr string) (*user.User, string, error) {
+	u, err := a.getUserFromJWT(usr)
+	if err == nil {
+		return u, "", nil
 	}
-
-	return a.getUserFromJWT(sessionCookie.Value)
+	// Missing or invalid session cookie
+	// Generate a new user
+	return a.CreateUserAndToken()
 }
 
-// CreateJWTCookie creates new cookie for specified user. Cookie values will have newly generated jwt token.
-func (a *Auth) CreateJWTCookie(u *user.User) (*http.Cookie, error) {
+// createJWT creates new jwt token for specified user.
+func (a *Auth) createJWT(u *user.User) (string, error) {
 	token, err := a.newToken(u)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create auth token: %w", err)
+		return "", fmt.Errorf("cannot create auth token: %w", err)
 	}
-	return &http.Cookie{
-		Name:  sessionCookieName,
-		Value: token,
-	}, nil
+	return token, nil
+}
+
+// CreateUserAndToken creates new user and corresponding jwt token.
+func (a *Auth) CreateUserAndToken() (*user.User, string, error) {
+	// Create user with unique ID
+	u, err := user.New()
+	if err != nil {
+		return nil, "", fmt.Errorf("cannot create new user: %w", err)
+	}
+
+	// Set Cookie for new user
+	sessionCookie, errS := a.createJWT(u)
+	if errS != nil {
+		return nil, "", fmt.Errorf("cannot create session cookie for user: %w", errS)
+	}
+	return u, sessionCookie, nil
 }
 
 func (a *Auth) getUserFromJWT(signedToken string) (*user.User, error) {
