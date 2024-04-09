@@ -187,4 +187,5 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "http", cfg.ServedScheme)
 	assert.Equal(t, "qweqwe", cfg.JWTSecret)
 	assert.True(t, cfg.TrustRequestID)
+	assert.True(t, cfg.GRPCReflection)
 }

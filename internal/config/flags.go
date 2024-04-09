@@ -51,7 +51,8 @@ func newFromFlags() (*Config, error) {
 	fs.StringVar(&cfg.TLS.KeyPath, "tls_key", "", "path to private key")
 	fs.StringVar(&cfg.TLS.CertPath, "tls_cert", "", "path to certificate")
 
-	fs.StringVarP(&cfg.Filter.Subnets, "trusted_subnets", "t", "", "comma separated list of trusted subnets, v4 and v6")
+	fs.StringVarP(&cfg.Filter.Subnets, "trusted_subnets", "t",
+		"127.0.0.0/8,::1/128", "comma separated list of trusted subnets, v4 and v6")
 	fs.BoolVar(&cfg.Filter.TrustXFF, "trust_x_forwarded_for", false,
 		"trust x-forwarded-for header during request filtering")
 	fs.BoolVar(&cfg.Filter.TrustXRealIP, "trust_x_real_ip", false, "trust x-real-ip header during request filtering")

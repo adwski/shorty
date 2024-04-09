@@ -23,7 +23,9 @@ import (
 )
 
 const (
-	defaultServerConnectionTimeout = 15 * time.Second
+	defaultServerConnectionTimeout = 3 * time.Second
+
+	defaultRPCTimeout = 5 * time.Second
 )
 
 // Server is grpc transport server for shorty app.
@@ -59,6 +61,8 @@ func NewServer(
 
 	// assign interceptors
 	opts = append(opts,
+		// deadline
+		grpc.ChainUnaryInterceptor(rpcDeadline(defaultRPCTimeout)),
 		// requestID
 		grpc.ChainUnaryInterceptor(requestid.New(logger, cfg.TrustRequestID).Get()),
 		// logging
@@ -118,5 +122,18 @@ func (srv *Server) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error)
 		srv.logger.Error("listener error", zap.Error(err))
 		errc <- err
 		s.GracefulStop()
+	}
+}
+
+func rpcDeadline(deadline time.Duration) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		_ *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		newCtx, cancel := context.WithTimeout(ctx, deadline)
+		defer cancel()
+		return handler(newCtx, req)
 	}
 }
