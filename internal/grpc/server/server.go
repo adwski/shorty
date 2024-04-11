@@ -114,15 +114,13 @@ func (srv *Server) Run(ctx context.Context, wg *sync.WaitGroup, errc chan error)
 	// wait for signals
 	select {
 	case <-ctx.Done():
-		s.GracefulStop()
-		if err = listener.Close(); err != nil {
-			srv.logger.Error("error while closing listener", zap.Error(err))
-		}
+		s.GracefulStop() // this also closes listeners, but do not catch errors (may be it's not so important?)
 	case err = <-errSrv:
 		srv.logger.Error("listener error", zap.Error(err))
 		errc <- err
 		s.GracefulStop()
 	}
+	srv.logger.Info("server stopped")
 }
 
 func rpcDeadline(deadline time.Duration) grpc.UnaryServerInterceptor {
