@@ -13,6 +13,7 @@ func mergeEnvs(cfg *Config) error {
 	envOverride("FILE_STORAGE_PATH", &cfg.Storage.FileStoragePath)
 	envOverride("DATABASE_DSN", &cfg.Storage.DatabaseDSN)
 	envOverride("JWT_SECRET", &cfg.JWTSecret)
+	envOverride("TRUSTED_SUBNETS", &cfg.Filter.Subnets)
 	if err := envOverrideBool("ENABLE_HTTPS", &cfg.TLS.Enable); err != nil {
 		return err
 	}

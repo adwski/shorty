@@ -13,6 +13,8 @@ Storage backends are
  - in-memory with fs persistence
  - database (PostgreSQL)
 
+HTTP and GRPC transports are supported.
+
 ## Development
 
 To be able to run all the tests you need to install

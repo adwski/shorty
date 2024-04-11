@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
+	authorizer "github.com/adwski/shorty/internal/auth"
+	"github.com/adwski/shorty/internal/filter"
 	"go.uber.org/zap"
 )
 
@@ -13,11 +15,18 @@ import (
 type Config struct {
 	Storage *Storage `json:"storage"`
 	TLS     *TLS     `json:"tls"`
+	Filter  *Filter  `json:"filter"`
 
-	tls            *tls.Config
+	tls *tls.Config
+
+	auth *authorizer.Auth
+
+	filter *filter.Filter
+
 	configFilePath string
 
 	ListenAddr      string `json:"listen_addr"`
+	GRPCListenAddr  string `json:"grpc_listen_addr"`
 	BaseURL         string `json:"base_url"`
 	RedirectScheme  string `json:"redirect_scheme"`
 	JWTSecret       string `json:"jwt_secret"`
@@ -25,6 +34,7 @@ type Config struct {
 	ServedHost      string `json:"-"`
 	ServedScheme    string `json:"-"`
 
+	GRPCReflection bool `json:"grpc_reflection"`
 	TrustRequestID bool `json:"trust_request_id"`
 }
 
@@ -34,12 +44,29 @@ func (cfg *Config) GetTLSConfig() *tls.Config {
 	return cfg.tls
 }
 
+// GetAuthorizer retrieves application's authorizer instance.
+func (cfg *Config) GetAuthorizer() *authorizer.Auth {
+	return cfg.auth
+}
+
+// GetFilter retrieves application's filter instance.
+func (cfg *Config) GetFilter() *filter.Filter {
+	return cfg.filter
+}
+
 // TLS holds Shorty tls configuration params.
 type TLS struct {
 	CertPath      string `json:"cert"`
 	KeyPath       string `json:"key"`
 	Enable        bool   `json:"enable"`
 	UseSelfSigned bool   `json:"self_signed"`
+}
+
+// Filter holds ip filter config params.
+type Filter struct {
+	Subnets      string `json:"trusted_subnets"`
+	TrustXFF     bool   `json:"trust_x_forwarded_for"`
+	TrustXRealIP bool   `json:"trust_x_real_ip"`
 }
 
 // Storage holds Shorty storage config params.
@@ -91,6 +118,18 @@ func New(logger *zap.Logger) (*Config, error) {
 		if err = cfg.createTLSConfig(logger); err != nil {
 			return nil, fmt.Errorf("tls config error: %w", err)
 		}
+	}
+
+	cfg.auth = authorizer.New(cfg.JWTSecret)
+
+	cfg.filter, err = filter.New(&filter.Config{
+		Logger:             logger,
+		Subnets:            cfg.Filter.Subnets,
+		TrustXForwardedFor: cfg.Filter.TrustXFF,
+		TrustXRealIP:       cfg.Filter.TrustXRealIP,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot configure filter: %w", err)
 	}
 
 	return cfg, nil

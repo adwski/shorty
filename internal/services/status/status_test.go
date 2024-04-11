@@ -3,9 +3,6 @@ package status
 import (
 	"context"
 	"errors"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/adwski/shorty/internal/app/mockapp"
@@ -20,23 +17,17 @@ func TestService_Status(t *testing.T) {
 	type args struct {
 		pingErr error
 	}
-	type want struct {
-		status int
-	}
 	tests := []struct {
 		name string
 		args args
-		want want
 	}{
 		{
 			name: "ping successful",
 			args: args{pingErr: nil},
-			want: want{status: http.StatusOK},
 		},
 		{
 			name: "ping unsuccessful",
 			args: args{pingErr: errors.New("test")},
-			want: want{status: http.StatusInternalServerError},
 		},
 	}
 	for _, tt := range tests {
@@ -54,17 +45,12 @@ func TestService_Status(t *testing.T) {
 				log:   logger,
 			}
 
-			r := httptest.NewRequest(http.MethodGet, "/ping", nil)
-			w := httptest.NewRecorder()
-			svc.Ping(w, r)
-			res := w.Result()
-
-			assert.Equal(t, tt.want.status, res.StatusCode)
-
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
-			require.NoError(t, res.Body.Close())
-			assert.Equal(t, "", string(resBody))
+			err = svc.Ping(ctx)
+			if tt.args.pingErr != nil {
+				assert.ErrorIs(t, err, tt.args.pingErr)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

@@ -95,3 +95,7 @@ godoc:
 	@echo "spawning godoc"
 	@echo "navigate to http://localhost:8111/pkg/github.com/adwski/shorty/?m=all"
 	godoc -http=:8111
+
+.PHONY: grpc
+grpc:
+	protoc --go_out=.  --go-grpc_out=.  internal/grpc/protobuf/shorty.proto

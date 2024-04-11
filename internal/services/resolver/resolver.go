@@ -5,13 +5,16 @@ package resolver
 import (
 	"context"
 	"errors"
-	"net/http"
+	"fmt"
+	"unicode"
 
-	"github.com/adwski/shorty/internal/session"
-
-	"github.com/adwski/shorty/internal/storage"
-	"github.com/adwski/shorty/internal/validate"
 	"go.uber.org/zap"
+)
+
+// Service errors.
+var (
+	ErrInvalidPath  = errors.New("invalid path")
+	ErrStorageError = errors.New("storage error")
 )
 
 // Storage is URL storage used by resolver.
@@ -40,36 +43,26 @@ func New(cfg *Config) *Service {
 	}
 }
 
-// Resolve reads URL path, retrieves corresponding URL from storage
-// and returns 307 response. It performs path validation before calling storage.
-func (svc *Service) Resolve(w http.ResponseWriter, req *http.Request) {
-	reqID, ok := session.GetRequestID(req.Context())
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		svc.log.Error("request id was not provided in context")
-		return
+// Resolve lookups original URL using incoming shortened path.
+func (svc *Service) Resolve(ctx context.Context, path string) (string, error) {
+	if err := validatePath(path); err != nil {
+		return "", errors.Join(ErrInvalidPath, err)
 	}
-	logf := svc.log.With(zap.String("id", reqID))
-
-	if err := validate.Path(req.URL.Path); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		logf.Error("redirect path is not valid", zap.Error(err))
-		return
-	}
-
-	redirect, err := svc.store.Get(req.Context(), req.URL.Path[1:])
+	origURL, err := svc.store.Get(ctx, path[1:])
 	if err != nil {
-		switch {
-		case errors.Is(err, storage.ErrNotFound):
-			w.WriteHeader(http.StatusNotFound)
-		case errors.Is(err, storage.ErrDeleted):
-			w.WriteHeader(http.StatusGone)
-		default:
-			logf.Error("cannot get redirect", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-		return
+		return "", errors.Join(ErrStorageError, err)
 	}
-	w.Header().Set("Location", redirect)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	return origURL, nil
+}
+
+func validatePath(path string) error {
+	if path[0] != '/' {
+		return fmt.Errorf("path is not starts with /")
+	}
+	for i := 1; i < len(path); i++ {
+		if !unicode.IsLetter(rune(path[i])) && !unicode.IsDigit(rune(path[i])) {
+			return fmt.Errorf("invalid character in path: 0x%x", path[i])
+		}
+	}
+	return nil
 }

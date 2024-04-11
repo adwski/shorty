@@ -3,25 +3,32 @@ package status
 
 import (
 	"context"
-	"net/http"
+	"errors"
 
+	"github.com/adwski/shorty/internal/model"
 	"go.uber.org/zap"
 )
 
-// Pingable is a pingable storage type used by status service.
-type Pingable interface {
+// Storage is a storage type used by status service.
+type Storage interface {
 	Ping(context.Context) error
+	Stats(context.Context) (*model.Stats, error)
 }
+
+// ErrStorageError is service error caused by underlying storage error.
+var (
+	ErrStorageError = errors.New("storage error")
+)
 
 // Service is a status service.
 type Service struct {
-	store Pingable
+	store Storage
 	log   *zap.Logger
 }
 
 // Config is status service config.
 type Config struct {
-	Storage Pingable
+	Storage Storage
 	Logger  *zap.Logger
 }
 
@@ -33,13 +40,19 @@ func New(cfg *Config) *Service {
 	}
 }
 
-// Ping pings the storage and returns 200 if ping is successful or 500 otherwise.
-func (svc *Service) Ping(w http.ResponseWriter, req *http.Request) {
-	err := svc.store.Ping(req.Context())
-	if err != nil {
-		svc.log.Error("storage ping unsuccessful", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		w.WriteHeader(http.StatusOK)
+// Ping pings the storage and returns error if ping is unsuccessful.
+func (svc *Service) Ping(ctx context.Context) error {
+	if err := svc.store.Ping(ctx); err != nil {
+		return errors.Join(ErrStorageError, err)
 	}
+	return nil
+}
+
+// Stats returns storage statistics.
+func (svc *Service) Stats(ctx context.Context) (*model.Stats, error) {
+	stats, err := svc.store.Stats(ctx)
+	if err != nil {
+		return nil, errors.Join(ErrStorageError, err)
+	}
+	return stats, nil
 }

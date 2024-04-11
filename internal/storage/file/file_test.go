@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adwski/shorty/internal/storage"
+	"github.com/adwski/shorty/internal/model"
 	"github.com/adwski/shorty/internal/storage/memory"
 	"github.com/adwski/shorty/internal/storage/memory/db"
 	"github.com/gofrs/uuid/v5"
@@ -18,12 +18,12 @@ import (
 func TestFileStore(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    *storage.URL
+		args    *model.URL
 		wantErr bool
 	}{
 		{
 			name: "store and get",
-			args: &storage.URL{
+			args: &model.URL{
 				Short: "aaa",
 				Orig:  "https://bbb.ccc",
 			},
@@ -79,7 +79,7 @@ func TestFileStore(t *testing.T) {
 func TestStore_Get(t *testing.T) {
 	type args struct {
 		db  map[string]string
-		url *storage.URL
+		url *model.URL
 	}
 	tests := []struct {
 		name string
@@ -90,7 +90,7 @@ func TestStore_Get(t *testing.T) {
 			name: "get existing",
 			args: args{
 				db: map[string]string{"aaa": "https://bbb.ccc"},
-				url: &storage.URL{
+				url: &model.URL{
 					Short: "aaa",
 					Orig:  "https://bbb.ccc",
 				},
@@ -100,12 +100,12 @@ func TestStore_Get(t *testing.T) {
 			name: "get not existing",
 			args: args{
 				db: map[string]string{},
-				url: &storage.URL{
+				url: &model.URL{
 					Short: "aaa",
 					Orig:  "https://bbb.ccc",
 				},
 			},
-			err: storage.ErrNotFound,
+			err: model.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
@@ -134,7 +134,7 @@ func TestStore_Get(t *testing.T) {
 
 func TestStore_Store(t *testing.T) {
 	type args struct {
-		url       *storage.URL
+		url       *model.URL
 		beforeDB  map[string]string
 		wantDB    map[string]string
 		wantErr   error
@@ -147,7 +147,7 @@ func TestStore_Store(t *testing.T) {
 		{
 			name: "store existing with overwrite",
 			args: args{
-				url: &storage.URL{
+				url: &model.URL{
 					Short: "aaa",
 					Orig:  "https://ddd.eee",
 				},
@@ -159,20 +159,20 @@ func TestStore_Store(t *testing.T) {
 		{
 			name: "store existing without overwrite",
 			args: args{
-				url: &storage.URL{
+				url: &model.URL{
 					Short: "aaa",
 					Orig:  "https://ddd.eee",
 				},
 				beforeDB:  map[string]string{"aaa": "https://bbb.ccc"},
 				wantDB:    map[string]string{"aaa": "https://bbb.ccc"},
-				wantErr:   storage.ErrAlreadyExists,
+				wantErr:   model.ErrAlreadyExists,
 				overwrite: false,
 			},
 		},
 		{
 			name: "store not existing",
 			args: args{
-				url: &storage.URL{
+				url: &model.URL{
 					Short: "aaa",
 					Orig:  "https://bbb.ccc",
 				},
