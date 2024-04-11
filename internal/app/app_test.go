@@ -70,14 +70,7 @@ func TestShorty(t *testing.T) {
 
 			cfg, err := config.New(logger)
 			require.NoError(t, err)
-			/*
-				cfg := &config.Config{
-					ListenAddr:   ":1111",
-					ServedHost:   "xxx.yyy",
-					ServedScheme: "http",
-					Filter:       &config.Filter{},
-				}
-			*/
+
 			shorty, err := NewShorty(logger, st, cfg)
 			require.NoError(t, err)
 

@@ -7,11 +7,11 @@ func merge(dst, src *Config) {
 }
 
 func mergeCommon(dst, src *Config) {
-	mergeStringDef(&dst.ListenAddr, &src.ListenAddr, defaults["listen_addr"])
-	mergeStringDef(&dst.GRPCListenAddr, &src.GRPCListenAddr, defaults["grpc_listen_addr"])
-	mergeStringDef(&dst.BaseURL, &src.BaseURL, defaults["base_url"])
+	mergeStringDef(&dst.ListenAddr, &src.ListenAddr, defaultListenAddr)
+	mergeStringDef(&dst.GRPCListenAddr, &src.GRPCListenAddr, defaultGRPCListenAddr)
+	mergeStringDef(&dst.BaseURL, &src.BaseURL, defaultBaseURL)
 	mergeString(&dst.RedirectScheme, &src.RedirectScheme)
-	mergeStringDef(&dst.JWTSecret, &src.JWTSecret, defaults["jwt_secret"])
+	mergeStringDef(&dst.JWTSecret, &src.JWTSecret, defaultJWTSecret)
 	mergeString(&dst.PprofServerAddr, &src.PprofServerAddr)
 	mergeBool(&dst.TrustRequestID, &src.TrustRequestID)
 	mergeBool(&dst.GRPCReflection, &src.GRPCReflection)
@@ -21,7 +21,7 @@ func mergeStorage(dst, src *Config) {
 	if dst.Storage == nil {
 		dst.Storage = src.Storage
 	} else if src.Storage != nil {
-		mergeStringDef(&dst.Storage.FileStoragePath, &src.Storage.FileStoragePath, defaults["file_storage_path"])
+		mergeStringDef(&dst.Storage.FileStoragePath, &src.Storage.FileStoragePath, defaultFileStoragePath)
 		mergeString(&dst.Storage.DatabaseDSN, &src.Storage.DatabaseDSN)
 		mergeBool(&dst.Storage.TraceDB, &src.Storage.TraceDB)
 	}
