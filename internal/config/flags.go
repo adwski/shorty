@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// params defaults
+// params defaults.
 const (
 	defaultListenAddr      = ":8080"
 	defaultGRPCListenAddr  = ":9090"
